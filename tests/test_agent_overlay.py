@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from kid_pc_monitor.agent_overlay import overlay_label
+from kid_pc_monitor.agent_overlay import overlay_label, overlay_state
 from kid_pc_monitor.host_platform import HostPlatform
 from kid_pc_monitor.pc_time_control import PCTimeControl
 
@@ -31,11 +31,33 @@ class OverlayLabelTests(unittest.TestCase):
         self.assertEqual(overlay_label(125), "Time left: 2h 05m")
 
 
+class OverlayStateTests(unittest.TestCase):
+    def test_none_when_nothing_to_show(self) -> None:
+        self.assertIsNone(overlay_state(None))
+        self.assertIsNone(overlay_state(0))
+
+    def test_not_urgent_with_plenty_of_time(self) -> None:
+        state = overlay_state(45)
+        assert state is not None
+        self.assertEqual(state.text, "Time left: 45 min")
+        self.assertFalse(state.urgent)
+
+    def test_urgent_within_final_five_minutes(self) -> None:
+        state = overlay_state(5)
+        assert state is not None
+        self.assertTrue(state.urgent)
+        self.assertTrue(overlay_state(1.5).urgent)  # type: ignore[union-attr]
+
+    def test_urgent_threshold_is_configurable(self) -> None:
+        self.assertFalse(overlay_state(9, urgent_below_minutes=5).urgent)  # type: ignore[union-attr]
+        self.assertTrue(overlay_state(9, urgent_below_minutes=10).urgent)  # type: ignore[union-attr]
+
+
 class _RecordingPlatform(HostPlatform):
     """Minimal platform stub that records on-screen overlay updates."""
 
     def __init__(self) -> None:
-        self.overlay_calls: list[str | None] = []
+        self.overlay_calls: list[tuple[str | None, bool]] = []
 
     def check_session_locked(self) -> bool:
         return False
@@ -58,8 +80,8 @@ class _RecordingPlatform(HostPlatform):
     def get_hostname(self) -> str:
         return "test-pc"
 
-    def update_time_overlay(self, text: str | None) -> None:
-        self.overlay_calls.append(text)
+    def update_time_overlay(self, text: str | None, *, urgent: bool = False) -> None:
+        self.overlay_calls.append((text, urgent))
 
 
 class UpdateTimeOverlayTests(unittest.TestCase):
@@ -74,7 +96,20 @@ class UpdateTimeOverlayTests(unittest.TestCase):
             control.set_daily_allowance(90)
             control.runtime.accumulated_seconds = 30 * 60  # 30 min used -> 60 left
             control.update_time_overlay()
-        self.assertEqual(platform.overlay_calls, ["Time left: 1h 00m"])
+        self.assertEqual(platform.overlay_calls, [("Time left: 1h 00m", False)])
+
+    def test_forwards_urgent_when_few_minutes_left(self) -> None:
+        platform = _RecordingPlatform()
+        with tempfile.TemporaryDirectory() as tmp:
+            control = PCTimeControl(
+                platform=platform,
+                data_directory=Path(tmp),
+                start_background_threads=False,
+            )
+            control.set_daily_allowance(90)
+            control.runtime.accumulated_seconds = 87 * 60  # 3 min left -> urgent
+            control.update_time_overlay()
+        self.assertEqual(platform.overlay_calls, [("Time left: 3 min", True)])
 
     def test_hidden_for_exempt_user(self) -> None:
         platform = _RecordingPlatform()
@@ -88,7 +123,7 @@ class UpdateTimeOverlayTests(unittest.TestCase):
             control.current_user = "kid"
             control.set_daily_allowance(90)
             control.update_time_overlay()
-        self.assertEqual(platform.overlay_calls, [None])
+        self.assertEqual(platform.overlay_calls, [(None, False)])
 
     def test_hidden_when_no_limit_set(self) -> None:
         platform = _RecordingPlatform()
@@ -99,7 +134,7 @@ class UpdateTimeOverlayTests(unittest.TestCase):
                 start_background_threads=False,
             )
             control.update_time_overlay()
-        self.assertEqual(platform.overlay_calls, [None])
+        self.assertEqual(platform.overlay_calls, [(None, False)])
 
 
 if __name__ == "__main__":

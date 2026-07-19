@@ -217,18 +217,24 @@ class _TimeOverlay:
     """
 
     _POLL_MS = 500
+    _NORMAL_BG = "#202020"
+    _NORMAL_FG = "#ffffff"
+    _URGENT_BG = "#b00020"  # red for the final minutes before a lock
+    _URGENT_FG = "#ffffff"
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._desired_text: str | None = None
+        self._desired_urgent = False
         self._started = False
         self._root: tk.Tk | None = None
         self._label: tk.Label | None = None
 
-    def update(self, text: str | None) -> None:
-        """Publish the text to display (or ``None`` to hide); start the UI lazily."""
+    def update(self, text: str | None, urgent: bool = False) -> None:
+        """Publish the text/urgency to display (or ``None`` to hide); start UI lazily."""
         with self._lock:
             self._desired_text = text
+            self._desired_urgent = urgent
             if self._started or text is None:
                 return
             self._started = True
@@ -281,12 +287,16 @@ class _TimeOverlay:
             return
         with self._lock:
             text = self._desired_text
+            urgent = self._desired_urgent
         try:
             if text is None:
                 root.withdraw()
             else:
-                if label.cget("text") != text:
-                    label.config(text=text)
+                bg = self._URGENT_BG if urgent else self._NORMAL_BG
+                fg = self._URGENT_FG if urgent else self._NORMAL_FG
+                if label.cget("text") != text or label.cget("bg") != bg:
+                    label.config(text=text, bg=bg, fg=fg)
+                    root.configure(bg=bg)
                     self._place_top_right(root)
                 root.deiconify()
                 root.lift()
@@ -306,8 +316,8 @@ class WindowsHostPlatform(HostPlatform):
     def __init__(self) -> None:
         self._time_overlay = _TimeOverlay()
 
-    def update_time_overlay(self, text: str | None) -> None:
-        self._time_overlay.update(text)
+    def update_time_overlay(self, text: str | None, *, urgent: bool = False) -> None:
+        self._time_overlay.update(text, urgent)
 
     def check_session_locked(self) -> bool:
         """

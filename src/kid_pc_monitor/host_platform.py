@@ -38,9 +38,10 @@ class HostPlatform(ABC):
     def get_hostname(self) -> str:
         """Machine name for agent protocol responses."""
 
-    def update_time_overlay(self, text: str | None) -> None:
+    def update_time_overlay(self, text: str | None, *, urgent: bool = False) -> None:
         """Show or update an always-on-top on-screen time-remaining overlay for
-        the logged-in user, or hide it when ``text`` is ``None``.
+        the logged-in user, or hide it when ``text`` is ``None``. ``urgent``
+        asks for an attention-grabbing style for the final minutes before a lock.
 
         Default is a no-op so only platforms with a desktop UI need to implement
         it (the agent calls this every tick from its monitor loop)."""

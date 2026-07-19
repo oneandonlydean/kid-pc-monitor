@@ -9,6 +9,19 @@ UI ignore it.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
+
+# Below this many minutes remaining, the overlay switches to an urgent style
+# (red/bold) so the last stretch before a lock is unmissable.
+URGENT_THRESHOLD_MINUTES = 5.0
+
+
+@dataclass(frozen=True)
+class OverlayState:
+    """What the on-screen overlay should currently show."""
+
+    text: str
+    urgent: bool
 
 
 def overlay_label(minutes_remaining: float | None) -> str | None:
@@ -28,3 +41,20 @@ def overlay_label(minutes_remaining: float | None) -> str | None:
         hours, minutes = divmod(total_minutes, 60)
         return f"Time left: {hours}h {minutes:02d}m"
     return f"Time left: {total_minutes} min"
+
+
+def overlay_state(
+    minutes_remaining: float | None,
+    *,
+    urgent_below_minutes: float = URGENT_THRESHOLD_MINUTES,
+) -> OverlayState | None:
+    """Return the overlay text and urgency, or ``None`` when nothing should show.
+
+    Urgency is on once ``minutes_remaining`` drops to ``urgent_below_minutes`` or
+    below (but is still positive), which the renderer uses to switch to a red
+    style for the final stretch before a lock.
+    """
+    label = overlay_label(minutes_remaining)
+    if label is None or minutes_remaining is None:
+        return None
+    return OverlayState(text=label, urgent=minutes_remaining <= urgent_below_minutes)

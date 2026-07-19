@@ -12,7 +12,7 @@ from datetime import datetime
 from datetime import time as dtime
 from pathlib import Path
 
-from kid_pc_monitor.agent_overlay import overlay_label
+from kid_pc_monitor.agent_overlay import overlay_state
 from kid_pc_monitor.agent_state import (
     AgentStateStore,
     DailySettings,
@@ -438,11 +438,11 @@ class PCTimeControl:
         Shows minutes remaining for a monitored user with an active limit and
         hides otherwise. No-op on platforms without an on-screen overlay.
         """
-        if self.should_monitor_user():
-            label = overlay_label(self.get_time_remaining())
+        state = overlay_state(self.get_time_remaining()) if self.should_monitor_user() else None
+        if state is None:
+            self.platform.update_time_overlay(None)
         else:
-            label = None
-        self.platform.update_time_overlay(label)
+            self.platform.update_time_overlay(state.text, urgent=state.urgent)
 
     def currently_in_lock_window(self):
         """
