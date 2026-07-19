@@ -142,3 +142,55 @@
     font-size: 14px;
     margin-top: 20px;
 }
+
+/* One-tap bonus time on PC cards */
+.bonus-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+
+.bonus-label {
+    font-size: 13px;
+    color: #555;
+}
+
+.bonus-btn {
+    padding: 4px 12px;
+    font-size: 13px;
+    border: 1px solid #9c27b0;
+    background: #fff;
+    color: #7b1fa2;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.bonus-btn:hover {
+    background: #f3e5f5;
+}
+
+.bonus-btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+/* Action feedback banner (mirrors action-pages.css) */
+.status-message {
+    padding: 12px;
+    margin: 12px 0;
+    border-radius: 5px;
+    text-align: center;
+    display: none;
+}
+
+.status-message.success {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.status-message.error {
+    background-color: #f8d7da;
+    color: #721c24;
+}

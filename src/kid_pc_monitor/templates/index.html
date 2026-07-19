@@ -57,6 +57,8 @@
             </button>
         </form>
 
+        <div id="status-message" class="status-message"></div>
+
         {% if pcs %}
             <h2>Available PCs:</h2>
             {% for ip, info in pcs.items() %}
@@ -74,6 +76,13 @@
                 <span class="status locked">🔒 LOCKED</span>
                 {% else %}
                 <span class="status online">● ONLINE</span>
+                {% endif %}
+                {% if info.get('reachable', true) and not info.get('connection_error') %}
+                <div class="bonus-row">
+                    <span class="bonus-label">🎁 Bonus time:</span>
+                    <button type="button" class="bonus-btn" data-action="bonus" data-ip="{{ ip }}" data-minutes="15">+15 min</button>
+                    <button type="button" class="bonus-btn" data-action="bonus" data-ip="{{ ip }}" data-minutes="30">+30 min</button>
+                </div>
                 {% endif %}
             </div>
             {% endfor %}
