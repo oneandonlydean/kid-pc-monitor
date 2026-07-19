@@ -105,6 +105,25 @@ class DispatchTests(unittest.TestCase):
             self.assertIs(control.daily.show_timer, False)
             self.assertIs(self._dispatch_ok(control, action="get", var="show_timer"), False)
 
+    def test_time_request_get_and_clear(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            control = self._control(tmp, hostname="kid-pc")
+            self.assertIsNone(self._dispatch_ok(control, action="get", var="time_request"))
+            control.request_more_time()
+            got = self._dispatch_ok(control, action="get", var="time_request")
+            self.assertIsInstance(got, str)  # ISO timestamp
+            self.assertEqual(
+                self._dispatch_ok(control, action="clear", var="time_request"), "cleared"
+            )
+            self.assertIsNone(control.runtime.time_request_at)
+
+    def test_extend_clears_time_request(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            control = self._control(tmp, hostname="kid-pc")
+            control.request_more_time()
+            self._dispatch_ok(control, action="extend", val=15)
+            self.assertIsNone(control.runtime.time_request_at)
+
     def test_get_settings_manual_lock_access_status(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             control = self._control(tmp, hostname="kid-pc")

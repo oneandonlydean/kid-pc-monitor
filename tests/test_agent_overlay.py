@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from collections.abc import Callable
 from pathlib import Path
 
 from kid_pc_monitor.agent_overlay import overlay_label, overlay_state
@@ -58,6 +59,7 @@ class _RecordingPlatform(HostPlatform):
 
     def __init__(self) -> None:
         self.overlay_calls: list[tuple[str | None, bool]] = []
+        self.request_handler: Callable[[], None] | None = None
 
     def check_session_locked(self) -> bool:
         return False
@@ -82,6 +84,9 @@ class _RecordingPlatform(HostPlatform):
 
     def update_time_overlay(self, text: str | None, *, urgent: bool = False) -> None:
         self.overlay_calls.append((text, urgent))
+
+    def set_overlay_request_handler(self, handler: Callable[[], None] | None) -> None:
+        self.request_handler = handler
 
 
 class UpdateTimeOverlayTests(unittest.TestCase):
@@ -148,6 +153,21 @@ class UpdateTimeOverlayTests(unittest.TestCase):
             )
             control.update_time_overlay()
         self.assertEqual(platform.overlay_calls, [(None, False)])
+
+    def test_overlay_request_button_records_a_time_request(self) -> None:
+        platform = _RecordingPlatform()
+        with tempfile.TemporaryDirectory() as tmp:
+            control = PCTimeControl(
+                platform=platform,
+                data_directory=Path(tmp),
+                start_background_threads=False,
+            )
+            # The agent registers its handler so the overlay button can reach it.
+            self.assertIsNotNone(platform.request_handler)
+            self.assertIsNone(control.runtime.time_request_at)
+            assert platform.request_handler is not None
+            platform.request_handler()  # simulate the kid clicking "Ask for more time"
+            self.assertIsNotNone(control.runtime.time_request_at)
 
 
 if __name__ == "__main__":

@@ -392,6 +392,8 @@ def action_request_fields(
         return "set", "wake_time", p.get("time"), None
     if action_name == "set_show_timer":
         return "set", "show_timer", bool(p.get("enabled")), None
+    if action_name == "dismiss_time_request":
+        return "clear", "time_request", None, None
     if action_name == "clear_usage_limit":
         return "clear", "daily_limit", None, None
     if action_name == "get_logs":
@@ -619,6 +621,7 @@ def settings_to_pc_info(
         "lock_times": lock_times,
         "wake_time": wake_time,
         "show_timer": bool(settings.get("show_timer", True)),
+        "time_request": settings.get("time_request"),
         "manual_lock_active": manual_lock_active,
         "enforcement_active": enforcement_active,
         "enforcement_reason": enforcement_reason,

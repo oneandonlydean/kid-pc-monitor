@@ -72,6 +72,9 @@ def _read_variable(control: Any, var: str) -> Any:
         return bool(control.runtime.manual_lock_active)
     if var == "show_timer":
         return bool(control.daily.show_timer)
+    if var == "time_request":
+        requested_at = control.runtime.time_request_at
+        return requested_at.isoformat() if requested_at is not None else None
     if var == "wake_time":
         return _format_time(control.daily.wake_time)
     if var == "cumulative_extension":
@@ -150,6 +153,8 @@ def _do_clear(control: Any, req: Request) -> list[Node]:
         control.warnings_sent.clear()
     elif var == "cumulative_extension":
         control.clear_extensions()
+    elif var == "time_request":
+        control.clear_time_request()
     else:  # manual_lock
         control.clear_manual_lock()
 

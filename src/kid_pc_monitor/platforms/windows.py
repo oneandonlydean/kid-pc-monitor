@@ -18,6 +18,7 @@ from kid_pc_monitor.network import get_primary_ipv4
 
 if TYPE_CHECKING:
     import tkinter as tk
+    from collections.abc import Callable
 
 # Must match scripts/install.py FIREWALL_RULE_DISPLAY_NAME
 _FIREWALL_RULE_DISPLAY_NAME = "Kid PC Monitor Agent (TCP 9999)"
@@ -229,6 +230,13 @@ class _TimeOverlay:
         self._started = False
         self._root: tk.Tk | None = None
         self._label: tk.Label | None = None
+        self._button: tk.Button | None = None
+        self._on_request: Callable[[], None] | None = None
+
+    def set_request_handler(self, handler: Callable[[], None] | None) -> None:
+        """Set the callback invoked when the kid clicks 'Ask for more time'."""
+        with self._lock:
+            self._on_request = handler
 
     def update(self, text: str | None, urgent: bool = False) -> None:
         """Publish the text/urgency to display (or ``None`` to hide); start UI lazily."""
@@ -252,8 +260,9 @@ class _TimeOverlay:
             root.title("PC Time Control")
             root.overrideredirect(True)  # borderless — no title bar to click away
             root.attributes("-topmost", True)
+            root.configure(bg=self._NORMAL_BG)
             try:
-                root.attributes("-alpha", 0.85)
+                root.attributes("-alpha", 0.9)
             except tk.TclError:
                 pass  # transparency is best-effort
             label = tk.Label(
@@ -261,17 +270,57 @@ class _TimeOverlay:
                 text="",
                 font=("Segoe UI", 11, "bold"),
                 fg="#ffffff",
-                bg="#202020",
+                bg=self._NORMAL_BG,
                 padx=14,
                 pady=7,
             )
-            label.pack()
+            label.pack(fill="x")
+            button = tk.Button(
+                root,
+                text="Ask for more time",
+                font=("Segoe UI", 9),
+                relief="flat",
+                bg="#3a3a3a",
+                fg="#ffffff",
+                activebackground="#4a4a4a",
+                activeforeground="#ffffff",
+                cursor="hand2",
+                command=self._handle_request_click,
+            )
+            button.pack(fill="x", padx=6, pady=(0, 6))
             self._root = root
             self._label = label
+            self._button = button
             root.after(self._POLL_MS, self._refresh)
             root.mainloop()
         except Exception as exc:
             logger.error("On-screen timer crashed: %s", exc, exc_info=True)
+
+    def _handle_request_click(self) -> None:
+        with self._lock:
+            handler = self._on_request
+        if handler is not None:
+            try:
+                handler()
+            except Exception as exc:
+                logging.getLogger("PCTimeControl").error("Time-request handler failed: %s", exc)
+        button = self._button
+        root = self._root
+        if button is not None:
+            try:
+                button.config(text="Request sent", state="disabled")
+                if root is not None:
+                    root.after(4000, self._restore_request_button)
+            except Exception:
+                pass
+
+    def _restore_request_button(self) -> None:
+        button = self._button
+        if button is not None:
+            try:
+                button.config(text="Ask for more time", state="normal")
+            except Exception:
+                pass
 
     def _place_top_right(self, root: tk.Tk) -> None:
         root.update_idletasks()
@@ -318,6 +367,9 @@ class WindowsHostPlatform(HostPlatform):
 
     def update_time_overlay(self, text: str | None, *, urgent: bool = False) -> None:
         self._time_overlay.update(text, urgent)
+
+    def set_overlay_request_handler(self, handler: Callable[[], None] | None) -> None:
+        self._time_overlay.set_request_handler(handler)
 
     def check_session_locked(self) -> bool:
         """

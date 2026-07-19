@@ -35,6 +35,8 @@ class RuntimeState:
     accumulated_seconds: float
     manual_lock_active: bool
     cumulative_extension_seconds: int
+    # When the kid last asked for more time (None once granted/dismissed/reset).
+    time_request_at: datetime | None = None
 
 
 def _format_time(value: dtime) -> str:
@@ -80,6 +82,7 @@ def reset_runtime_for_new_period(runtime: RuntimeState, now: datetime | None = N
     runtime.accumulated_seconds = 0.0
     runtime.manual_lock_active = False
     runtime.cumulative_extension_seconds = 0
+    runtime.time_request_at = None
 
 
 def reset_runtime_if_needed(
@@ -113,6 +116,11 @@ def runtime_to_dict(runtime: RuntimeState) -> dict:
         "accumulated_seconds": round(runtime.accumulated_seconds, 3),
         "manual_lock_active": runtime.manual_lock_active,
         "cumulative_extension_seconds": runtime.cumulative_extension_seconds,
+        "time_request_at": (
+            runtime.time_request_at.isoformat(timespec="seconds")
+            if runtime.time_request_at is not None
+            else None
+        ),
     }
 
 
@@ -179,11 +187,16 @@ def load_runtime_from_dict(data: dict) -> RuntimeState:
     timestamp_raw = data.get("timestamp")
     if not isinstance(timestamp_raw, str):
         raise ValueError("state.json missing timestamp")
+    request_raw = data.get("time_request_at")
+    time_request_at = (
+        _parse_timestamp(request_raw) if isinstance(request_raw, str) and request_raw else None
+    )
     return RuntimeState(
         timestamp=_parse_timestamp(timestamp_raw),
         accumulated_seconds=float(data.get("accumulated_seconds", 0.0)),
         manual_lock_active=bool(data.get("manual_lock_active", False)),
         cumulative_extension_seconds=int(data.get("cumulative_extension_seconds", 0)),
+        time_request_at=time_request_at,
     )
 
 

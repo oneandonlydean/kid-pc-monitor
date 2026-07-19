@@ -114,6 +114,9 @@ class PCTimeControl:
         self.load_state()
         self.warnings_date = usage_period_date(datetime.now(), self.daily.wake_time)
 
+        # Let the on-screen overlay's "Ask for more time" button reach us.
+        self.platform.set_overlay_request_handler(self.request_more_time)
+
         if start_background_threads:
             self.monitor_thread = threading.Thread(target=self.monitor_activity, daemon=True)
             self.monitor_thread.start()
@@ -330,12 +333,23 @@ class PCTimeControl:
         """Add temporary extra allowance for the current usage period."""
         self.runtime.cumulative_extension_seconds += minutes * 60
         self.runtime.manual_lock_active = False
+        self.runtime.time_request_at = None  # granting answers any pending request
         self.warnings_sent.clear()
         self.logger.info("Parent action: extended time by %d minutes", minutes)
 
     def clear_extensions(self) -> None:
         self.runtime.cumulative_extension_seconds = 0
         self.logger.info("Parent action: time extensions cleared")
+
+    def request_more_time(self) -> None:
+        """Record that the kid asked for more time (from the on-screen overlay button)."""
+        self.runtime.time_request_at = datetime.now()
+        self.logger.info("Kid requested more time")
+
+    def clear_time_request(self) -> None:
+        """Clear a pending 'more time' request (parent dismissed it)."""
+        self.runtime.time_request_at = None
+        self.logger.info("Parent action: time request cleared")
 
     def show_message(self, message, title="PC Time Control"):
         """Display a message to the logged-in user (OS-specific UI)."""

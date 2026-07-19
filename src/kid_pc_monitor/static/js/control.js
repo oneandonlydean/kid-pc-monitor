@@ -8,6 +8,13 @@ import {
     startControlPagePoll,
 } from "./core.js";
 
+function hideRequestBanner() {
+    const banner = document.querySelector(".request-banner");
+    if (banner) {
+        banner.remove();
+    }
+}
+
 function grantExtension(button) {
     const minutes = parsePositiveInt(
         document.getElementById("extension-minutes").value
@@ -18,7 +25,7 @@ function grantExtension(button) {
     }
     postAction(
         { action: "extend_time", minutes: minutes },
-        { button: button, refreshStats: true }
+        { button: button, refreshStats: true, onSuccess: hideRequestBanner }
     );
 }
 
@@ -64,6 +71,12 @@ registerHandlers({
         postAction(
             { action: "clear_manual_lock" },
             { button: el, refreshStats: true }
+        );
+    },
+    "dismiss-request": function (el) {
+        postAction(
+            { action: "dismiss_time_request" },
+            { button: el, onSuccess: hideRequestBanner }
         );
     },
     "toggle-timer": function (el) {

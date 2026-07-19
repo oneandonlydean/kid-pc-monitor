@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import sys
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 
 
 class HostPlatform(ABC):
@@ -45,6 +46,11 @@ class HostPlatform(ABC):
 
         Default is a no-op so only platforms with a desktop UI need to implement
         it (the agent calls this every tick from its monitor loop)."""
+        return
+
+    def set_overlay_request_handler(self, handler: Callable[[], None] | None) -> None:
+        """Register the callback invoked when the kid clicks the overlay's
+        "Ask for more time" button. Default is a no-op."""
         return
 
     def log_connectivity_diagnostics(

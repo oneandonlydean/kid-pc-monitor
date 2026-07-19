@@ -13,12 +13,14 @@ from kid_pc_monitor.remote_client import (
     AgentLogsUnavailable,
     _legacy_access_status,
     _print_frame,
+    action_request_fields,
     get_agent_logs,
     is_pc_reachable,
     parse_scan_subnet,
     refresh_discovered_entry,
     scan_for_servers,
     send_request,
+    settings_to_pc_info,
 )
 
 SECRET = "test-shared-secret"
@@ -30,6 +32,30 @@ class RemoteClientTests(unittest.TestCase):
         self.assertEqual(_legacy_access_status("UNLOCKED", False), "Unlocked")
         self.assertEqual(_legacy_access_status("LOCKED", False), "Screen locked")
         self.assertEqual(_legacy_access_status("UNLOCKED", True), "Locked — manual lock")
+
+    def test_dismiss_time_request_maps_to_clear(self) -> None:
+        self.assertEqual(
+            action_request_fields("dismiss_time_request"),
+            ("clear", "time_request", None, None),
+        )
+
+    def test_set_show_timer_maps_to_boolean_set(self) -> None:
+        self.assertEqual(
+            action_request_fields("set_show_timer", {"enabled": True}),
+            ("set", "show_timer", True, None),
+        )
+
+    def test_settings_to_pc_info_surfaces_timer_and_request(self) -> None:
+        info = settings_to_pc_info(
+            {"show_timer": False, "time_request": "2026-07-20T15:30:00"},
+            host="192.168.1.9",
+        )
+        self.assertIs(info["show_timer"], False)
+        self.assertEqual(info["time_request"], "2026-07-20T15:30:00")
+        # Defaults when the agent omits the fields.
+        legacy = settings_to_pc_info({}, host="192.168.1.9")
+        self.assertIs(legacy["show_timer"], True)
+        self.assertIsNone(legacy["time_request"])
 
     def test_is_pc_reachable_open_port(self) -> None:
         ready = threading.Event()

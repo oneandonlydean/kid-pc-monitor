@@ -52,6 +52,13 @@
         <div id="status-message" class="status-message"></div>
 
         {% if pc_info.get('reachable', true) %}
+        {% if pc_info.get('time_request') %}
+        <div class="status-message banner request-banner">
+            ⏰ <strong>{{ pc_info.current_user or 'Your child' }}</strong> asked for more time{% if format_snapshot_recorded_at(pc_info.time_request) %} ({{ format_snapshot_recorded_at(pc_info.time_request) }}){% endif %}.
+            Grant an extension below to approve, or
+            <button type="button" class="link-btn" data-action="dismiss-request">dismiss</button>.
+        </div>
+        {% endif %}
         <div class="action-group">
             <div class="action-title">🔒 Quick Actions</div>
             <button class="btn btn-lock" data-action="lock">Lock Computer Now</button>

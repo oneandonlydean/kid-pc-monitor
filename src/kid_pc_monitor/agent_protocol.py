@@ -83,6 +83,7 @@ VARIABLES: dict[str, str] = {
     "manual_lock": "boolean, whether a manual lock is in effect",
     "wake_time": "time, at which the computer can be used the following morning",
     "show_timer": "boolean, whether the kid's on-screen countdown overlay is shown",
+    "time_request": "read-only, ISO time the kid last asked for more time (or null)",
     "cumulative_extension": "read-only, a running total of extension seconds today",
     "accumulated_seconds": "read-only, a running total of active seconds used today",
     "time_remaining": "read-only, minutes remaining today (or null)",
@@ -94,7 +95,9 @@ VARIABLES: dict[str, str] = {
 WRITABLE_VARIABLES = frozenset(
     {"daily_limit", "bed_time", "manual_lock", "wake_time", "show_timer"}
 )
-CLEARABLE_VARIABLES = frozenset({"daily_limit", "bed_time", "manual_lock", "cumulative_extension"})
+CLEARABLE_VARIABLES = frozenset(
+    {"daily_limit", "bed_time", "manual_lock", "cumulative_extension", "time_request"}
+)
 
 # A daily limit outside this range is almost certainly a mistake.
 MIN_DAILY_LIMIT = 1

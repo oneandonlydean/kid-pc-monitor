@@ -38,6 +38,22 @@
 .btn-save:hover     { background-color: #0b7dda; }
 .btn-timer    { background-color: #00897b; color: white; }
 .btn-timer:hover    { background-color: #00695c; }
+
+.request-banner {
+    background-color: #fff3e0;
+    color: #6d4c00;
+    border: 1px solid #ffb74d;
+}
+
+.link-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #b26a00;
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+}
 .btn-clear    { background-color: #f44336; color: white; }
 
 .status-message {
