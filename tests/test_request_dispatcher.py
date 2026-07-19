@@ -95,6 +95,16 @@ class DispatchTests(unittest.TestCase):
             self.assertIsNone(settings["enforcement_reason"])
             self.assertEqual(settings["access_status"], "Unlocked")
 
+    def test_show_timer_get_and_set(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            control = self._control(tmp, hostname="kid-pc")
+            self.assertIs(self._dispatch_ok(control, action="get", var="show_timer"), True)
+            self.assertIs(
+                self._dispatch_ok(control, action="set", var="show_timer", val=False), False
+            )
+            self.assertIs(control.daily.show_timer, False)
+            self.assertIs(self._dispatch_ok(control, action="get", var="show_timer"), False)
+
     def test_get_settings_manual_lock_access_status(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             control = self._control(tmp, hostname="kid-pc")

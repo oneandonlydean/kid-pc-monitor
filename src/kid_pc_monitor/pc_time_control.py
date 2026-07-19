@@ -313,6 +313,11 @@ class PCTimeControl:
         self.warnings_date = usage_period_date(now, self.daily.wake_time)
         self.logger.info("Parent action: wake time set to %02d:%02d", hour, minute)
 
+    def set_show_timer(self, enabled: bool) -> None:
+        """Show or hide the kid's on-screen countdown overlay (parent action)."""
+        self.daily.show_timer = enabled
+        self.logger.info("Parent action: on-screen timer %s", "shown" if enabled else "hidden")
+
     def set_daily_allowance(self, minutes: int | None) -> None:
         """Set the default daily screen-time allowance in minutes."""
         self.daily.allowance = minutes
@@ -438,7 +443,8 @@ class PCTimeControl:
         Shows minutes remaining for a monitored user with an active limit and
         hides otherwise. No-op on platforms without an on-screen overlay.
         """
-        state = overlay_state(self.get_time_remaining()) if self.should_monitor_user() else None
+        show = self.should_monitor_user() and self.daily.show_timer
+        state = overlay_state(self.get_time_remaining()) if show else None
         if state is None:
             self.platform.update_time_overlay(None)
         else:

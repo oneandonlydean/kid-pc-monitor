@@ -125,6 +125,19 @@ class UpdateTimeOverlayTests(unittest.TestCase):
             control.update_time_overlay()
         self.assertEqual(platform.overlay_calls, [(None, False)])
 
+    def test_hidden_when_show_timer_disabled(self) -> None:
+        platform = _RecordingPlatform()
+        with tempfile.TemporaryDirectory() as tmp:
+            control = PCTimeControl(
+                platform=platform,
+                data_directory=Path(tmp),
+                start_background_threads=False,
+            )
+            control.set_daily_allowance(90)
+            control.set_show_timer(False)  # parent hid the overlay
+            control.update_time_overlay()
+        self.assertEqual(platform.overlay_calls, [(None, False)])
+
     def test_hidden_when_no_limit_set(self) -> None:
         platform = _RecordingPlatform()
         with tempfile.TemporaryDirectory() as tmp:

@@ -107,6 +107,33 @@ class AgentStateTests(unittest.TestCase):
             self.assertAlmostEqual(loaded_runtime.accumulated_seconds, 300.0)
             self.assertEqual(loaded_runtime.cumulative_extension_seconds, 900)
 
+    def test_store_round_trip_persists_show_timer(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = AgentStateStore(Path(tmp), current_user="kid")
+            daily = DailySettings(
+                bed_time=None, wake_time=dtime(7, 0), allowance=60, show_timer=False
+            )
+            runtime = RuntimeState(
+                timestamp=datetime.now(),
+                accumulated_seconds=0,
+                manual_lock_active=False,
+                cumulative_extension_seconds=0,
+            )
+            store.save(daily, runtime)
+            loaded_daily, _ = store.load()
+            self.assertIs(loaded_daily.show_timer, False)
+
+    def test_show_timer_defaults_true_for_legacy_settings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            data_dir = Path(tmp)
+            (data_dir / "daily_settings.json").write_text(
+                json.dumps({"wake_time": "07:00", "bed_time": None, "allowance": 60}),
+                encoding="utf-8",
+            )
+            store = AgentStateStore(data_dir, current_user="kid")
+            loaded_daily, _ = store.load()
+            self.assertIs(loaded_daily.show_timer, True)
+
     def test_store_resets_stale_runtime_on_load(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             data_dir = Path(tmp)

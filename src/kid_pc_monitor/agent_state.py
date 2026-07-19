@@ -26,6 +26,7 @@ class DailySettings:
     bed_time: dtime | None
     wake_time: dtime
     allowance: int | None  # minutes; None = no screen-time cap
+    show_timer: bool = True  # whether the kid's on-screen countdown overlay is shown
 
 
 @dataclass
@@ -97,6 +98,7 @@ def daily_to_dict(daily: DailySettings) -> dict:
     payload: dict = {
         "wake_time": _format_time(daily.wake_time),
         "allowance": daily.allowance,
+        "show_timer": daily.show_timer,
     }
     if daily.bed_time is not None:
         payload["bed_time"] = _format_time(daily.bed_time)
@@ -133,6 +135,7 @@ def load_daily_from_dict(data: dict) -> DailySettings:
         bed_time=bed_time,
         wake_time=wake_time,
         allowance=allowance,
+        show_timer=bool(data.get("show_timer", True)),
     )
 
 

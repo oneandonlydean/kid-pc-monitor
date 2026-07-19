@@ -36,6 +36,8 @@
 .btn-limit:hover    { background-color: #7b1fa2; }
 .btn-save     { background-color: #2196F3; color: white; }
 .btn-save:hover     { background-color: #0b7dda; }
+.btn-timer    { background-color: #00897b; color: white; }
+.btn-timer:hover    { background-color: #00695c; }
 .btn-clear    { background-color: #f44336; color: white; }
 
 .status-message {

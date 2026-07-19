@@ -59,6 +59,17 @@
         </div>
 
         <div class="action-group">
+            <div class="action-title">⏳ On-Screen Timer</div>
+            <p class="note">
+                A small always-on-top countdown on the kid's screen showing time left today.
+            </p>
+            <button class="btn btn-timer" data-action="toggle-timer"
+                data-enabled="{{ 'true' if pc_info.get('show_timer', true) else 'false' }}">
+                {{ 'Hide on-screen timer' if pc_info.get('show_timer', true) else 'Show on-screen timer' }}
+            </button>
+        </div>
+
+        <div class="action-group">
             <div class="action-title">💬 Send Message</div>
             <input type="text" id="message-text" placeholder="Type your message here...">
             <button class="btn btn-message" data-action="send-message">Send Message</button>

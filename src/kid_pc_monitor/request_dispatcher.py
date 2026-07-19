@@ -70,6 +70,8 @@ def _read_variable(control: Any, var: str) -> Any:
         return _format_time(control.daily.bed_time)
     if var == "manual_lock":
         return bool(control.runtime.manual_lock_active)
+    if var == "show_timer":
+        return bool(control.daily.show_timer)
     if var == "wake_time":
         return _format_time(control.daily.wake_time)
     if var == "cumulative_extension":
@@ -120,6 +122,10 @@ def _do_set(control: Any, req: Request) -> list[Node]:
         hour, minute = _parse_hhmm(val, req_id)
         control.set_wake_time(hour, minute)
         result = f"{hour:02d}:{minute:02d}"
+    elif var == "show_timer":
+        enabled = _parse_bool(val, req_id)
+        control.set_show_timer(enabled)
+        result = enabled
     else:  # manual_lock
         engaged = _parse_bool(val, req_id)
         if engaged:

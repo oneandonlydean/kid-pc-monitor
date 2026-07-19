@@ -66,6 +66,21 @@ registerHandlers({
             { button: el, refreshStats: true }
         );
     },
+    "toggle-timer": function (el) {
+        const enabled = el.getAttribute("data-enabled") === "false";
+        postAction(
+            { action: "set_show_timer", enabled: enabled },
+            {
+                button: el,
+                onSuccess: function () {
+                    el.setAttribute("data-enabled", enabled ? "true" : "false");
+                    el.textContent = enabled
+                        ? "Hide on-screen timer"
+                        : "Show on-screen timer";
+                },
+            }
+        );
+    },
 });
 
 if (document.body.classList.contains("page-control")) {
