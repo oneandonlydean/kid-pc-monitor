@@ -406,6 +406,37 @@ class PCTimeControlTests(unittest.TestCase):
             control.set_break_interval(0)
             self.assertIsNone(control.runtime.break_active_until)
 
+    def _weekend_control(self, tmp: str) -> PCTimeControl:
+        control = PCTimeControl(
+            platform=FakeHostPlatform(),
+            data_directory=Path(tmp),
+            start_background_threads=False,
+        )
+        control.daily.allowance = 60
+        control.daily.bed_time = dtime(21, 0)
+        control.daily.weekend_allowance = 180
+        control.daily.weekend_bed_time = dtime(22, 30)
+        return control
+
+    def test_weekend_schedule_used_on_weekend_when_enabled(self) -> None:
+        saturday = datetime(2026, 7, 18, 10, 0)  # a Saturday
+        wednesday = datetime(2026, 7, 15, 10, 0)
+        with tempfile.TemporaryDirectory() as tmp:
+            control = self._weekend_control(tmp)
+            control.daily.weekend_enabled = True
+            self.assertEqual(control._effective_base_allowance(saturday), 180)
+            self.assertEqual(control._effective_bed_time(saturday), dtime(22, 30))
+            self.assertEqual(control._effective_base_allowance(wednesday), 60)
+            self.assertEqual(control._effective_bed_time(wednesday), dtime(21, 0))
+
+    def test_weekend_schedule_ignored_when_disabled(self) -> None:
+        saturday = datetime(2026, 7, 18, 10, 0)
+        with tempfile.TemporaryDirectory() as tmp:
+            control = self._weekend_control(tmp)
+            control.daily.weekend_enabled = False
+            self.assertEqual(control._effective_base_allowance(saturday), 60)
+            self.assertEqual(control._effective_bed_time(saturday), dtime(21, 0))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -26,6 +26,7 @@ from kid_pc_monitor.lock_policy import (
     DEFAULT_WAKE_TIME,
     enforcement_state,
     format_access_status,
+    is_weekend_period,
     lock_decision,
     minutes_until_lock,
     should_monitor_user,
@@ -208,8 +209,26 @@ class PCTimeControl:
 
         return lines, truncated
 
-    def _effective_usage_allowance_minutes(self) -> float | None:
-        return effective_daily_allowance_minutes(self.daily, self.runtime)
+    def _is_weekend(self, now: datetime) -> bool:
+        return self.daily.weekend_enabled and is_weekend_period(now, self.daily.wake_time)
+
+    def _effective_bed_time(self, now: datetime) -> dtime | None:
+        if self._is_weekend(now):
+            return self.daily.weekend_bed_time
+        return self.daily.bed_time
+
+    def _effective_base_allowance(self, now: datetime) -> int | None:
+        if self._is_weekend(now):
+            return self.daily.weekend_allowance
+        return self.daily.allowance
+
+    def _effective_usage_allowance_minutes(self, now: datetime | None = None) -> float | None:
+        now = now or datetime.now()
+        base = self._effective_base_allowance(now)
+        extension_minutes = self.runtime.cumulative_extension_seconds / 60
+        if base is None:
+            return extension_minutes if extension_minutes > 0 else None
+        return base + extension_minutes
 
     def _reset_runtime_if_needed(self, *, now: datetime | None = None) -> bool:
         now = now or datetime.now()
@@ -380,6 +399,27 @@ class PCTimeControl:
         else:
             self.logger.info("Parent action: daily limit set to %d minutes", minutes)
 
+    def set_weekend_enabled(self, enabled: bool) -> None:
+        """Turn the separate Saturday/Sunday schedule on or off."""
+        self.daily.weekend_enabled = enabled
+        self.logger.info("Parent action: weekend schedule %s", "enabled" if enabled else "disabled")
+
+    def set_weekend_bed_time(self, hour: int, minute: int) -> None:
+        self.daily.weekend_bed_time = dtime(hour, minute)
+        self.logger.info("Parent action: weekend bed time set to %02d:%02d", hour, minute)
+
+    def clear_weekend_bed_time(self) -> None:
+        self.daily.weekend_bed_time = None
+        self.logger.info("Parent action: weekend bed time cleared")
+
+    def set_weekend_allowance(self, minutes: int | None) -> None:
+        """Set the Saturday/Sunday screen-time allowance in minutes (None = no cap)."""
+        self.daily.weekend_allowance = minutes
+        if minutes is None:
+            self.logger.info("Parent action: weekend daily limit cleared")
+        else:
+            self.logger.info("Parent action: weekend daily limit set to %d minutes", minutes)
+
     def extend_time(self, minutes: int) -> None:
         """Add temporary extra allowance for the current usage period."""
         self.runtime.cumulative_extension_seconds += minutes * 60
@@ -447,10 +487,11 @@ class PCTimeControl:
 
     def get_time_remaining(self):
         """Calculate minutes remaining until lock. Returns None if no allowance set."""
+        now = datetime.now()
         return minutes_until_lock(
-            now=datetime.now(),
-            bed_time=self.daily.bed_time,
-            effective_usage_allowance_minutes=self._effective_usage_allowance_minutes(),
+            now=now,
+            bed_time=self._effective_bed_time(now),
+            effective_usage_allowance_minutes=self._effective_usage_allowance_minutes(now),
             accumulated_minutes=self.runtime.accumulated_seconds / 60,
             monitor_user=self.should_monitor_user(),
             manual_lock_active=self.runtime.manual_lock_active,
@@ -523,10 +564,11 @@ class PCTimeControl:
         or before wake is still locked out. Usage-allowance enforcement is a
         simple "minutes-used >= allowance" check for the current wake-to-wake day.
         """
+        now = datetime.now()
         decision = lock_decision(
-            now=datetime.now(),
-            bed_time=self.daily.bed_time,
-            effective_usage_allowance_minutes=self._effective_usage_allowance_minutes(),
+            now=now,
+            bed_time=self._effective_bed_time(now),
+            effective_usage_allowance_minutes=self._effective_usage_allowance_minutes(now),
             accumulated_minutes=self.runtime.accumulated_seconds / 60,
             monitor_user=self.should_monitor_user(),
             manual_lock_active=self.runtime.manual_lock_active,
@@ -540,10 +582,11 @@ class PCTimeControl:
 
     def enforcement_lock_state(self) -> tuple[bool, str | None]:
         """Return schedule/limit enforcement without considering manual lock."""
+        now = datetime.now()
         return enforcement_state(
-            now=datetime.now(),
-            bed_time=self.daily.bed_time,
-            effective_usage_allowance_minutes=self._effective_usage_allowance_minutes(),
+            now=now,
+            bed_time=self._effective_bed_time(now),
+            effective_usage_allowance_minutes=self._effective_usage_allowance_minutes(now),
             accumulated_minutes=self.runtime.accumulated_seconds / 60,
             monitor_user=self.should_monitor_user(),
             wake_time=self.daily.wake_time,

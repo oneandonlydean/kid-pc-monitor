@@ -83,6 +83,12 @@ def _read_variable(control: Any, var: str) -> Any:
         return int(control.daily.break_duration_minutes)
     if var == "on_break":
         return bool(control.on_break())
+    if var == "weekend_enabled":
+        return bool(control.daily.weekend_enabled)
+    if var == "weekend_bed_time":
+        return _format_time(control.daily.weekend_bed_time)
+    if var == "weekend_allowance":
+        return control.daily.weekend_allowance
     if var == "wake_time":
         return _format_time(control.daily.wake_time)
     if var == "cumulative_extension":
@@ -153,6 +159,24 @@ def _do_set(control: Any, req: Request) -> list[Node]:
             )
         control.set_break_duration(minutes)
         result = minutes
+    elif var == "weekend_enabled":
+        enabled = _parse_bool(val, req_id)
+        control.set_weekend_enabled(enabled)
+        result = enabled
+    elif var == "weekend_bed_time":
+        hour, minute = _parse_hhmm(val, req_id)
+        control.set_weekend_bed_time(hour, minute)
+        result = f"{hour:02d}:{minute:02d}"
+    elif var == "weekend_allowance":
+        minutes = _parse_int(val, req_id)
+        if not (MIN_DAILY_LIMIT <= minutes <= MAX_DAILY_LIMIT):
+            raise ProtocolError(
+                INVALID_VALUE,
+                f"minutes must be between {MIN_DAILY_LIMIT} and {MAX_DAILY_LIMIT}",
+                req_id,
+            )
+        control.set_weekend_allowance(minutes)
+        result = minutes
     else:  # manual_lock
         engaged = _parse_bool(val, req_id)
         if engaged:
@@ -181,6 +205,10 @@ def _do_clear(control: Any, req: Request) -> list[Node]:
         control.clear_time_request()
     elif var == "break_interval":
         control.set_break_interval(0)
+    elif var == "weekend_bed_time":
+        control.clear_weekend_bed_time()
+    elif var == "weekend_allowance":
+        control.set_weekend_allowance(None)
     else:  # manual_lock
         control.clear_manual_lock()
 

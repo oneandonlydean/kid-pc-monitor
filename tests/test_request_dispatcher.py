@@ -134,6 +134,28 @@ class DispatchTests(unittest.TestCase):
             self._dispatch_ok(control, action="clear", var="break_interval")
             self.assertEqual(control.daily.break_interval_minutes, 0)
 
+    def test_weekend_schedule_get_set_and_clear(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            control = self._control(tmp, hostname="kid-pc")
+            self.assertIs(self._dispatch_ok(control, action="get", var="weekend_enabled"), False)
+            self.assertIs(
+                self._dispatch_ok(control, action="set", var="weekend_enabled", val=True), True
+            )
+            self.assertEqual(
+                self._dispatch_ok(control, action="set", var="weekend_bed_time", val="22:30"),
+                "22:30",
+            )
+            self.assertEqual(
+                self._dispatch_ok(control, action="set", var="weekend_allowance", val=180), 180
+            )
+            self.assertTrue(control.daily.weekend_enabled)
+            self.assertEqual(control.daily.weekend_bed_time, dtime(22, 30))
+            self.assertEqual(control.daily.weekend_allowance, 180)
+            self._dispatch_ok(control, action="clear", var="weekend_allowance")
+            self._dispatch_ok(control, action="clear", var="weekend_bed_time")
+            self.assertIsNone(control.daily.weekend_allowance)
+            self.assertIsNone(control.daily.weekend_bed_time)
+
     def test_break_interval_rejects_out_of_range(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             control = self._control(tmp, hostname="kid-pc")

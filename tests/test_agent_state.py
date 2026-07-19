@@ -14,6 +14,7 @@ from kid_pc_monitor.agent_state import (
     DailySettings,
     RuntimeState,
     effective_daily_allowance_minutes,
+    fresh_runtime_state,
     migrate_legacy_state,
     reset_runtime_for_new_period,
     reset_runtime_if_needed,
@@ -122,6 +123,23 @@ class AgentStateTests(unittest.TestCase):
             store.save(daily, runtime)
             loaded_daily, _ = store.load()
             self.assertIs(loaded_daily.show_timer, False)
+
+    def test_weekend_schedule_round_trip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = AgentStateStore(Path(tmp), current_user="kid")
+            daily = DailySettings(
+                bed_time=dtime(21, 0),
+                wake_time=dtime(7, 0),
+                allowance=60,
+                weekend_enabled=True,
+                weekend_bed_time=dtime(22, 30),
+                weekend_allowance=180,
+            )
+            store.save(daily, fresh_runtime_state())
+            loaded, _ = store.load()
+            self.assertTrue(loaded.weekend_enabled)
+            self.assertEqual(loaded.weekend_bed_time, dtime(22, 30))
+            self.assertEqual(loaded.weekend_allowance, 180)
 
     def test_break_config_round_trip(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

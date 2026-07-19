@@ -87,6 +87,9 @@ VARIABLES: dict[str, str] = {
     "break_interval": "active minutes between forced breaks (0 = off)",
     "break_duration": "how many minutes each forced break lasts",
     "on_break": "read-only, whether a forced break is currently in effect",
+    "weekend_enabled": "boolean, whether the separate Sat/Sun schedule is active",
+    "weekend_bed_time": "bedtime used on Sat/Sun when the weekend schedule is on",
+    "weekend_allowance": "daily limit (minutes) used on Sat/Sun when the weekend schedule is on",
     "cumulative_extension": "read-only, a running total of extension seconds today",
     "accumulated_seconds": "read-only, a running total of active seconds used today",
     "time_remaining": "read-only, minutes remaining today (or null)",
@@ -104,6 +107,9 @@ WRITABLE_VARIABLES = frozenset(
         "show_timer",
         "break_interval",
         "break_duration",
+        "weekend_enabled",
+        "weekend_bed_time",
+        "weekend_allowance",
     }
 )
 CLEARABLE_VARIABLES = frozenset(
@@ -114,6 +120,8 @@ CLEARABLE_VARIABLES = frozenset(
         "cumulative_extension",
         "time_request",
         "break_interval",
+        "weekend_bed_time",
+        "weekend_allowance",
     }
 )
 

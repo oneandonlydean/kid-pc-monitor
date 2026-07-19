@@ -65,6 +65,11 @@ def usage_period_date(now: datetime, wake_time: dtime = DEFAULT_WAKE_TIME) -> da
     return now.date()
 
 
+def is_weekend_period(now: datetime, wake_time: dtime = DEFAULT_WAKE_TIME) -> bool:
+    """True when the current wake-to-wake usage period is a Saturday or Sunday."""
+    return usage_period_date(now, wake_time).weekday() >= 5
+
+
 def is_in_bedtime_curfew(
     now: datetime,
     bed_time: dtime,

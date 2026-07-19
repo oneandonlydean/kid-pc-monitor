@@ -56,4 +56,38 @@ registerHandlers({
             { button: el, reloadDelay: 1000 }
         );
     },
+    "save-weekend-enabled": function (el) {
+        const enabled = document.getElementById("weekend-enabled").checked;
+        postAction(
+            { action: "set_weekend_enabled", enabled: enabled },
+            { button: el, reloadDelay: 1000 }
+        );
+    },
+    "save-weekend-allowance": function (el) {
+        const value = document.getElementById("weekend-allowance").value.trim();
+        postAction(
+            { action: "set_weekend_allowance", minutes: value },
+            { button: el, reloadDelay: 1000 }
+        );
+    },
+    "save-weekend-bed-time": function (el) {
+        const time = document.getElementById("weekend-bed-time").value;
+        if (!time) {
+            showStatus("Please select a weekend bedtime", false);
+            return;
+        }
+        postAction(
+            { action: "set_weekend_bed_time", time: time },
+            { button: el, reloadDelay: 1000 }
+        );
+    },
+    "clear-weekend-bed-time": function (el) {
+        if (!confirm("Remove the weekend bedtime?")) {
+            return;
+        }
+        postAction(
+            { action: "clear_weekend_bed_time" },
+            { button: el, reloadDelay: 1000 }
+        );
+    },
 });

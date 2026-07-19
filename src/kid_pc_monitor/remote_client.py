@@ -401,6 +401,17 @@ def action_request_fields(
         return "set", "break_interval", int(minutes), None
     if action_name == "set_break_duration":
         return "set", "break_duration", int(p["minutes"]), None
+    if action_name == "set_weekend_enabled":
+        return "set", "weekend_enabled", bool(p.get("enabled")), None
+    if action_name == "set_weekend_bed_time":
+        return "set", "weekend_bed_time", p.get("time"), None
+    if action_name == "clear_weekend_bed_time":
+        return "clear", "weekend_bed_time", None, None
+    if action_name == "set_weekend_allowance":
+        minutes = p.get("minutes")
+        if minutes is None or minutes == "":
+            return "clear", "weekend_allowance", None, None
+        return "set", "weekend_allowance", int(minutes), None
     if action_name == "clear_usage_limit":
         return "clear", "daily_limit", None, None
     if action_name == "get_logs":
@@ -632,6 +643,9 @@ def settings_to_pc_info(
         "break_interval": int(settings.get("break_interval") or 0),
         "break_duration": int(settings.get("break_duration") or 5),
         "on_break": bool(settings.get("on_break")),
+        "weekend_enabled": bool(settings.get("weekend_enabled")),
+        "weekend_bed_time": settings.get("weekend_bed_time"),
+        "weekend_allowance": settings.get("weekend_allowance"),
         "manual_lock_active": manual_lock_active,
         "enforcement_active": enforcement_active,
         "enforcement_reason": enforcement_reason,

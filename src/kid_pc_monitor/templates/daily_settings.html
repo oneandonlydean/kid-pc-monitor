@@ -48,6 +48,34 @@
             <input type="time" id="wake-time" value="{{ pc_info.get('wake_time', '07:00') or '07:00' }}">
             <button class="btn btn-save" data-action="save-wake-time">Save wake-up time</button>
         </div>
+
+        <div class="action-group">
+            <div class="action-title">🎉 Weekend schedule (Sat &amp; Sun)</div>
+            <p class="hint">
+                Optionally use a different allowance and bedtime on Saturday and Sunday.
+                The weekday settings above apply the rest of the week.
+            </p>
+            <label class="weekend-toggle">
+                <input type="checkbox" id="weekend-enabled"
+                    {% if pc_info.get('weekend_enabled') %}checked{% endif %}>
+                Use a separate weekend schedule
+            </label>
+            <button class="btn btn-save" data-action="save-weekend-enabled">Save weekend on/off</button>
+
+            <p class="hint">Weekend allowance (minutes) — leave blank for no cap.</p>
+            <input type="number" id="weekend-allowance"
+                   placeholder="Minutes, e.g. 180"
+                   value="{{ pc_info.weekend_allowance if pc_info.get('weekend_allowance') is not none else '' }}">
+            <button class="btn btn-save" data-action="save-weekend-allowance">Save weekend allowance</button>
+
+            <p class="hint">Weekend bedtime.</p>
+            <input type="time" id="weekend-bed-time"
+                   value="{{ pc_info.get('weekend_bed_time', '22:00') or '22:00' }}">
+            <button class="btn btn-save" data-action="save-weekend-bed-time">Save weekend bedtime</button>
+            {% if pc_info.get('weekend_bed_time') %}
+            <button class="btn btn-clear" data-action="clear-weekend-bed-time">Remove weekend bedtime</button>
+            {% endif %}
+        </div>
     </div>
 {% endblock %}
 

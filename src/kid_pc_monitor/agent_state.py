@@ -29,6 +29,10 @@ class DailySettings:
     show_timer: bool = True  # whether the kid's on-screen countdown overlay is shown
     break_interval_minutes: int = 0  # active minutes between forced breaks; 0 = off
     break_duration_minutes: int = 5  # how long each forced break lock lasts
+    # Optional separate schedule for Saturday/Sunday; used only when enabled.
+    weekend_enabled: bool = False
+    weekend_bed_time: dtime | None = None
+    weekend_allowance: int | None = None
 
 
 @dataclass
@@ -112,6 +116,11 @@ def daily_to_dict(daily: DailySettings) -> dict:
         "show_timer": daily.show_timer,
         "break_interval_minutes": daily.break_interval_minutes,
         "break_duration_minutes": daily.break_duration_minutes,
+        "weekend_enabled": daily.weekend_enabled,
+        "weekend_bed_time": (
+            _format_time(daily.weekend_bed_time) if daily.weekend_bed_time is not None else None
+        ),
+        "weekend_allowance": daily.weekend_allowance,
     }
     if daily.bed_time is not None:
         payload["bed_time"] = _format_time(daily.bed_time)
@@ -155,6 +164,15 @@ def load_daily_from_dict(data: dict) -> DailySettings:
     if allowance is not None:
         allowance = int(allowance)
 
+    weekend_bed_raw = data.get("weekend_bed_time")
+    if weekend_bed_raw is None or weekend_bed_raw == "":
+        weekend_bed_time = None
+    else:
+        weekend_bed_time = parse_time_hhmm(str(weekend_bed_raw))
+    weekend_allowance = data.get("weekend_allowance")
+    if weekend_allowance is not None:
+        weekend_allowance = int(weekend_allowance)
+
     return DailySettings(
         bed_time=bed_time,
         wake_time=wake_time,
@@ -162,6 +180,9 @@ def load_daily_from_dict(data: dict) -> DailySettings:
         show_timer=bool(data.get("show_timer", True)),
         break_interval_minutes=int(data.get("break_interval_minutes", 0) or 0),
         break_duration_minutes=int(data.get("break_duration_minutes", 5) or 5),
+        weekend_enabled=bool(data.get("weekend_enabled", False)),
+        weekend_bed_time=weekend_bed_time,
+        weekend_allowance=weekend_allowance,
     )
 
 
