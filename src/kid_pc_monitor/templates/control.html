@@ -77,6 +77,25 @@
         </div>
 
         <div class="action-group">
+            <div class="action-title">🧍 Break reminders</div>
+            <p class="note">
+                Lock the screen for a stretch break after a set amount of active use. Set minutes to 0 to turn off.
+                {% if pc_info.get('on_break') %}<strong>(On a break right now.)</strong>{% endif %}
+            </p>
+            <div class="break-fields">
+                <label>Every
+                    <input type="number" id="break-interval" min="0" max="600"
+                        value="{{ pc_info.get('break_interval', 0) }}"> min of use
+                </label>
+                <label>lock for
+                    <input type="number" id="break-duration" min="1" max="120"
+                        value="{{ pc_info.get('break_duration', 5) }}"> min
+                </label>
+            </div>
+            <button class="btn btn-timer" data-action="save-breaks">Save break settings</button>
+        </div>
+
+        <div class="action-group">
             <div class="action-title">💬 Send Message</div>
             <input type="text" id="message-text" placeholder="Type your message here...">
             <button class="btn btn-message" data-action="send-message">Send Message</button>

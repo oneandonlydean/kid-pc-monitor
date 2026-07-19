@@ -8,7 +8,7 @@ import math
 import os
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from datetime import time as dtime
 from pathlib import Path
 
@@ -321,6 +321,57 @@ class PCTimeControl:
         self.daily.show_timer = enabled
         self.logger.info("Parent action: on-screen timer %s", "shown" if enabled else "hidden")
 
+    def set_break_interval(self, minutes: int) -> None:
+        """Set the active-use minutes between forced breaks (0 disables breaks)."""
+        self.daily.break_interval_minutes = max(0, minutes)
+        if minutes <= 0:
+            self.runtime.break_active_until = None
+            self.logger.info("Parent action: break reminders disabled")
+        else:
+            self.logger.info("Parent action: break every %d minutes of use", minutes)
+
+    def set_break_duration(self, minutes: int) -> None:
+        """Set how long each forced break lasts."""
+        self.daily.break_duration_minutes = max(1, minutes)
+        self.logger.info(
+            "Parent action: break duration set to %d minutes", self.daily.break_duration_minutes
+        )
+
+    def on_break(self, now: datetime | None = None) -> bool:
+        """True while a forced break lock is in effect."""
+        until = self.runtime.break_active_until
+        if until is None:
+            return False
+        return (now or datetime.now()) < until
+
+    def update_break_state(self, now: datetime | None = None) -> None:
+        """Start or end forced breaks based on active use since the last break."""
+        now = now or datetime.now()
+        interval = self.daily.break_interval_minutes
+        duration = self.daily.break_duration_minutes
+
+        if interval <= 0 or duration <= 0 or not self.should_monitor_user():
+            self.runtime.break_active_until = None
+            return
+
+        if self.runtime.break_active_until is not None:
+            if now >= self.runtime.break_active_until:
+                self.runtime.break_active_until = None
+                self.runtime.break_baseline_seconds = self.runtime.accumulated_seconds
+                self.logger.info("Break over; resuming")
+            return
+
+        active_since_break = self.runtime.accumulated_seconds - self.runtime.break_baseline_seconds
+        if active_since_break >= interval * 60:
+            self.runtime.break_active_until = now + timedelta(minutes=duration)
+            unit = "minute" if duration == 1 else "minutes"
+            self.show_message(
+                "Break time! Stand up, stretch, and look at something far away.\n"
+                f"Your screen will unlock in {duration} {unit}.",
+                "Break time",
+            )
+            self.logger.info("Break started: %d min lock after %d min of use", duration, interval)
+
     def set_daily_allowance(self, minutes: int | None) -> None:
         """Set the default daily screen-time allowance in minutes."""
         self.daily.allowance = minutes
@@ -481,7 +532,11 @@ class PCTimeControl:
             manual_lock_active=self.runtime.manual_lock_active,
             wake_time=self.daily.wake_time,
         )
-        return decision.should_lock, decision.reason
+        if decision.should_lock:
+            return decision.should_lock, decision.reason
+        if self.on_break():
+            return True, "Break time"
+        return False, ""
 
     def enforcement_lock_state(self) -> tuple[bool, str | None]:
         """Return schedule/limit enforcement without considering manual lock."""
@@ -514,6 +569,7 @@ class PCTimeControl:
         last_logged_reason = None
         while True:
             self.tick_accumulator()
+            self.update_break_state()
             self.check_and_send_warnings()
             self.update_time_overlay()
 

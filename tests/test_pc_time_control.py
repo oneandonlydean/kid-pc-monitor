@@ -352,6 +352,60 @@ class PCTimeControlTests(unittest.TestCase):
             )
             self.assertTrue(control.check_if_locked())
 
+    def _break_control(self, tmp: str) -> PCTimeControl:
+        control = PCTimeControl(
+            platform=FakeHostPlatform(),
+            data_directory=Path(tmp),
+            start_background_threads=False,
+        )
+        control.daily.break_interval_minutes = 45
+        control.daily.break_duration_minutes = 5
+        return control
+
+    def test_break_lifecycle(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            platform = FakeHostPlatform()
+            control = PCTimeControl(
+                platform=platform,
+                data_directory=Path(tmp),
+                start_background_threads=False,
+            )
+            control.daily.break_interval_minutes = 45
+            control.daily.break_duration_minutes = 5
+            now = datetime.now()
+            # Not enough active use yet.
+            control.runtime.accumulated_seconds = 44 * 60
+            control.update_break_state(now)
+            self.assertFalse(control.on_break(now))
+            # Interval reached -> a break starts and the screen should lock.
+            control.runtime.accumulated_seconds = 45 * 60
+            control.update_break_state(now)
+            self.assertTrue(control.on_break(now))
+            locked, reason = control.currently_in_lock_window()
+            self.assertTrue(locked)
+            self.assertEqual(reason, "Break time")
+            self.assertTrue(any(title == "Break time" for title, _ in platform.messages))
+            # After the duration the break ends and the counter baseline resets.
+            later = now + timedelta(minutes=5)
+            control.update_break_state(later)
+            self.assertFalse(control.on_break(later))
+            self.assertEqual(control.runtime.break_baseline_seconds, 45 * 60)
+
+    def test_breaks_disabled_never_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            control = self._break_control(tmp)
+            control.daily.break_interval_minutes = 0  # off
+            control.runtime.accumulated_seconds = 100 * 60
+            control.update_break_state(datetime.now())
+            self.assertFalse(control.on_break())
+
+    def test_set_break_interval_zero_clears_active_break(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            control = self._break_control(tmp)
+            control.runtime.break_active_until = datetime.now() + timedelta(minutes=5)
+            control.set_break_interval(0)
+            self.assertIsNone(control.runtime.break_active_until)
+
 
 if __name__ == "__main__":
     unittest.main()

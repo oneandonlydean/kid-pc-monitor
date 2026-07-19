@@ -54,6 +54,22 @@
     text-decoration: underline;
     cursor: pointer;
 }
+
+.break-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 6px 0 10px;
+}
+
+.break-fields label {
+    font-size: 14px;
+    color: #333;
+}
+
+.break-fields input {
+    width: 64px;
+}
 .btn-clear    { background-color: #f44336; color: white; }
 
 .status-message {

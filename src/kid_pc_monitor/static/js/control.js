@@ -79,6 +79,36 @@ registerHandlers({
             { button: el, onSuccess: hideRequestBanner }
         );
     },
+    "save-breaks": function (el) {
+        const interval = parseInt(
+            document.getElementById("break-interval").value,
+            10
+        );
+        const duration = parseInt(
+            document.getElementById("break-duration").value,
+            10
+        );
+        if (isNaN(interval) || interval < 0) {
+            showStatus("Enter a break interval of 0 or more minutes", false);
+            return;
+        }
+        if (isNaN(duration) || duration < 1) {
+            showStatus("Enter a break length of at least 1 minute", false);
+            return;
+        }
+        postAction(
+            { action: "set_break_duration", minutes: duration },
+            {
+                button: el,
+                onSuccess: function () {
+                    postAction(
+                        { action: "set_break_interval", minutes: interval },
+                        { button: el, refreshStats: true }
+                    );
+                },
+            }
+        );
+    },
     "toggle-timer": function (el) {
         const enabled = el.getAttribute("data-enabled") === "false";
         postAction(

@@ -10,6 +10,8 @@ from kid_pc_monitor.agent_protocol import (
     DEFAULT_SHUTDOWN_SECONDS,
     FORBIDDEN,
     INVALID_VALUE,
+    MAX_BREAK_DURATION,
+    MAX_BREAK_INTERVAL,
     MAX_DAILY_LIMIT,
     MAX_FRAME_BYTES,
     MIN_DAILY_LIMIT,
@@ -75,6 +77,12 @@ def _read_variable(control: Any, var: str) -> Any:
     if var == "time_request":
         requested_at = control.runtime.time_request_at
         return requested_at.isoformat() if requested_at is not None else None
+    if var == "break_interval":
+        return int(control.daily.break_interval_minutes)
+    if var == "break_duration":
+        return int(control.daily.break_duration_minutes)
+    if var == "on_break":
+        return bool(control.on_break())
     if var == "wake_time":
         return _format_time(control.daily.wake_time)
     if var == "cumulative_extension":
@@ -129,6 +137,22 @@ def _do_set(control: Any, req: Request) -> list[Node]:
         enabled = _parse_bool(val, req_id)
         control.set_show_timer(enabled)
         result = enabled
+    elif var == "break_interval":
+        minutes = _parse_int(val, req_id)
+        if not (0 <= minutes <= MAX_BREAK_INTERVAL):
+            raise ProtocolError(
+                INVALID_VALUE, f"minutes must be between 0 and {MAX_BREAK_INTERVAL}", req_id
+            )
+        control.set_break_interval(minutes)
+        result = minutes
+    elif var == "break_duration":
+        minutes = _parse_int(val, req_id)
+        if not (1 <= minutes <= MAX_BREAK_DURATION):
+            raise ProtocolError(
+                INVALID_VALUE, f"minutes must be between 1 and {MAX_BREAK_DURATION}", req_id
+            )
+        control.set_break_duration(minutes)
+        result = minutes
     else:  # manual_lock
         engaged = _parse_bool(val, req_id)
         if engaged:
@@ -155,6 +179,8 @@ def _do_clear(control: Any, req: Request) -> list[Node]:
         control.clear_extensions()
     elif var == "time_request":
         control.clear_time_request()
+    elif var == "break_interval":
+        control.set_break_interval(0)
     else:  # manual_lock
         control.clear_manual_lock()
 

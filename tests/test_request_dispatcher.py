@@ -117,6 +117,29 @@ class DispatchTests(unittest.TestCase):
             )
             self.assertIsNone(control.runtime.time_request_at)
 
+    def test_break_config_get_set_and_clear(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            control = self._control(tmp, hostname="kid-pc")
+            self.assertEqual(self._dispatch_ok(control, action="get", var="break_interval"), 0)
+            self.assertEqual(
+                self._dispatch_ok(control, action="set", var="break_duration", val=10), 10
+            )
+            self.assertEqual(
+                self._dispatch_ok(control, action="set", var="break_interval", val=45), 45
+            )
+            self.assertEqual(control.daily.break_interval_minutes, 45)
+            self.assertEqual(control.daily.break_duration_minutes, 10)
+            self.assertIs(self._dispatch_ok(control, action="get", var="on_break"), False)
+            # Clearing turns breaks off.
+            self._dispatch_ok(control, action="clear", var="break_interval")
+            self.assertEqual(control.daily.break_interval_minutes, 0)
+
+    def test_break_interval_rejects_out_of_range(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            control = self._control(tmp, hostname="kid-pc")
+            with self.assertRaises(ProtocolError):
+                self._dispatch(control, _req(action="set", var="break_interval", val=99999))
+
     def test_extend_clears_time_request(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             control = self._control(tmp, hostname="kid-pc")

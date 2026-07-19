@@ -123,6 +123,29 @@ class AgentStateTests(unittest.TestCase):
             loaded_daily, _ = store.load()
             self.assertIs(loaded_daily.show_timer, False)
 
+    def test_break_config_round_trip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = AgentStateStore(Path(tmp), current_user="kid")
+            daily = DailySettings(
+                bed_time=None,
+                wake_time=dtime(7, 0),
+                allowance=60,
+                break_interval_minutes=45,
+                break_duration_minutes=10,
+            )
+            runtime = RuntimeState(
+                timestamp=datetime.now(),
+                accumulated_seconds=0,
+                manual_lock_active=False,
+                cumulative_extension_seconds=0,
+                break_baseline_seconds=1800.0,
+            )
+            store.save(daily, runtime)
+            loaded_daily, loaded_runtime = store.load()
+            self.assertEqual(loaded_daily.break_interval_minutes, 45)
+            self.assertEqual(loaded_daily.break_duration_minutes, 10)
+            self.assertEqual(loaded_runtime.break_baseline_seconds, 1800.0)
+
     def test_time_request_round_trip(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             store = AgentStateStore(Path(tmp), current_user="kid")

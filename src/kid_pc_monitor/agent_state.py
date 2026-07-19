@@ -27,6 +27,8 @@ class DailySettings:
     wake_time: dtime
     allowance: int | None  # minutes; None = no screen-time cap
     show_timer: bool = True  # whether the kid's on-screen countdown overlay is shown
+    break_interval_minutes: int = 0  # active minutes between forced breaks; 0 = off
+    break_duration_minutes: int = 5  # how long each forced break lock lasts
 
 
 @dataclass
@@ -37,6 +39,10 @@ class RuntimeState:
     cumulative_extension_seconds: int
     # When the kid last asked for more time (None once granted/dismissed/reset).
     time_request_at: datetime | None = None
+    # When the current forced break ends (None when not on a break).
+    break_active_until: datetime | None = None
+    # accumulated_seconds value at the last break end; usage past it drives the next break.
+    break_baseline_seconds: float = 0.0
 
 
 def _format_time(value: dtime) -> str:
@@ -83,6 +89,8 @@ def reset_runtime_for_new_period(runtime: RuntimeState, now: datetime | None = N
     runtime.manual_lock_active = False
     runtime.cumulative_extension_seconds = 0
     runtime.time_request_at = None
+    runtime.break_active_until = None
+    runtime.break_baseline_seconds = 0.0
 
 
 def reset_runtime_if_needed(
@@ -102,6 +110,8 @@ def daily_to_dict(daily: DailySettings) -> dict:
         "wake_time": _format_time(daily.wake_time),
         "allowance": daily.allowance,
         "show_timer": daily.show_timer,
+        "break_interval_minutes": daily.break_interval_minutes,
+        "break_duration_minutes": daily.break_duration_minutes,
     }
     if daily.bed_time is not None:
         payload["bed_time"] = _format_time(daily.bed_time)
@@ -121,6 +131,12 @@ def runtime_to_dict(runtime: RuntimeState) -> dict:
             if runtime.time_request_at is not None
             else None
         ),
+        "break_active_until": (
+            runtime.break_active_until.isoformat(timespec="seconds")
+            if runtime.break_active_until is not None
+            else None
+        ),
+        "break_baseline_seconds": round(runtime.break_baseline_seconds, 3),
     }
 
 
@@ -144,6 +160,8 @@ def load_daily_from_dict(data: dict) -> DailySettings:
         wake_time=wake_time,
         allowance=allowance,
         show_timer=bool(data.get("show_timer", True)),
+        break_interval_minutes=int(data.get("break_interval_minutes", 0) or 0),
+        break_duration_minutes=int(data.get("break_duration_minutes", 5) or 5),
     )
 
 
@@ -191,12 +209,18 @@ def load_runtime_from_dict(data: dict) -> RuntimeState:
     time_request_at = (
         _parse_timestamp(request_raw) if isinstance(request_raw, str) and request_raw else None
     )
+    break_raw = data.get("break_active_until")
+    break_active_until = (
+        _parse_timestamp(break_raw) if isinstance(break_raw, str) and break_raw else None
+    )
     return RuntimeState(
         timestamp=_parse_timestamp(timestamp_raw),
         accumulated_seconds=float(data.get("accumulated_seconds", 0.0)),
         manual_lock_active=bool(data.get("manual_lock_active", False)),
         cumulative_extension_seconds=int(data.get("cumulative_extension_seconds", 0)),
         time_request_at=time_request_at,
+        break_active_until=break_active_until,
+        break_baseline_seconds=float(data.get("break_baseline_seconds", 0.0)),
     )
 
 
