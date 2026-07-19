@@ -29,6 +29,33 @@
             {% for group in pc_groups %}
             <div class="action-group usage-pc-group">
                 <div class="action-title">💻 {{ group.hostname }}</div>
+                {% set chart = group.chart %}
+                {% if chart and chart.has_data %}
+                <div class="usage-chart">
+                    <div class="usage-bars">
+                        {% for bar in chart.bars %}
+                        <div class="usage-bar-col">
+                            <div class="usage-bar-track">
+                                {% if not bar.no_data %}
+                                {% if bar.limit_pct is not none %}
+                                <div class="usage-bar-limit" style="bottom: {{ bar.limit_pct }}%"
+                                    title="Allowance {{ format_minutes_duration(bar.allowance_minutes) }}"></div>
+                                {% endif %}
+                                <div class="usage-bar-fill{% if bar.over_limit %} over{% endif %}"
+                                    style="height: {{ bar.height_pct }}%"
+                                    title="{{ format_minutes_duration(bar.used_minutes) }} used"></div>
+                                {% endif %}
+                            </div>
+                            <div class="usage-bar-label">{{ bar.label }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="usage-chart-scale">
+                        Scale 0–{{ chart.scale_minutes }} min · <span class="usage-legend-limit">▬</span> allowance ·
+                        <span class="usage-legend-over">■</span> over limit
+                    </div>
+                </div>
+                {% endif %}
                 <table class="usage-table">
                     <thead>
                         <tr>

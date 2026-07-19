@@ -33,6 +33,7 @@ from kid_pc_monitor.panel_format import (
     format_minutes_duration,
     format_seconds_duration,
     format_snapshot_recorded_at,
+    usage_chart,
 )
 from kid_pc_monitor.panel_reverse_server import (
     get_reverse_server,
@@ -583,6 +584,8 @@ def create_app() -> Flask:
     @login_required
     def usage_history(username: str):
         pc_groups = get_usage_history_for_user(username, days=7)
+        for group in pc_groups:
+            group["chart"] = usage_chart(group["days"])
         return render_template(
             "usage_history.html",
             username=username,
