@@ -11,9 +11,13 @@ import subprocess
 import sys
 import threading
 from ctypes import wintypes
+from typing import TYPE_CHECKING
 
 from kid_pc_monitor.host_platform import HostPlatform
 from kid_pc_monitor.network import get_primary_ipv4
+
+if TYPE_CHECKING:
+    import tkinter as tk
 
 # Must match scripts/install.py FIREWALL_RULE_DISPLAY_NAME
 _FIREWALL_RULE_DISPLAY_NAME = "Kid PC Monitor Agent (TCP 9999)"
@@ -200,8 +204,110 @@ def _query_session_locked_via_wts() -> bool | None:
         return None
 
 
+class _TimeOverlay:
+    """A small always-on-top window showing the kid's remaining time.
+
+    tkinter requires every call for a given root to run on one thread, so the
+    window lives on its own daemon thread running the Tk event loop. The
+    monitoring thread only publishes the desired text via ``update``; the UI
+    thread polls it and repaints. The thread starts lazily the first time there
+    is something to show, so an unmonitored or unlimited session never creates a
+    window. Once running it stays alive and just hides (``withdraw``) whenever
+    the text is ``None``, so it can reappear without restarting.
+    """
+
+    _POLL_MS = 500
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._desired_text: str | None = None
+        self._started = False
+        self._root: tk.Tk | None = None
+        self._label: tk.Label | None = None
+
+    def update(self, text: str | None) -> None:
+        """Publish the text to display (or ``None`` to hide); start the UI lazily."""
+        with self._lock:
+            self._desired_text = text
+            if self._started or text is None:
+                return
+            self._started = True
+        threading.Thread(target=self._run, name="kpm-time-overlay", daemon=True).start()
+
+    def _run(self) -> None:
+        logger = logging.getLogger("PCTimeControl")
+        try:
+            import tkinter as tk
+        except Exception as exc:
+            logger.warning("On-screen timer unavailable (tkinter import failed): %s", exc)
+            return
+        try:
+            root = tk.Tk()
+            root.title("PC Time Control")
+            root.overrideredirect(True)  # borderless — no title bar to click away
+            root.attributes("-topmost", True)
+            try:
+                root.attributes("-alpha", 0.85)
+            except tk.TclError:
+                pass  # transparency is best-effort
+            label = tk.Label(
+                root,
+                text="",
+                font=("Segoe UI", 11, "bold"),
+                fg="#ffffff",
+                bg="#202020",
+                padx=14,
+                pady=7,
+            )
+            label.pack()
+            self._root = root
+            self._label = label
+            root.after(self._POLL_MS, self._refresh)
+            root.mainloop()
+        except Exception as exc:
+            logger.error("On-screen timer crashed: %s", exc, exc_info=True)
+
+    def _place_top_right(self, root: tk.Tk) -> None:
+        root.update_idletasks()
+        width = root.winfo_width()
+        screen_width = root.winfo_screenwidth()
+        x = max(0, screen_width - width - 20)
+        root.geometry(f"+{x}+20")
+
+    def _refresh(self) -> None:
+        root = self._root
+        label = self._label
+        if root is None or label is None:
+            return
+        with self._lock:
+            text = self._desired_text
+        try:
+            if text is None:
+                root.withdraw()
+            else:
+                if label.cget("text") != text:
+                    label.config(text=text)
+                    self._place_top_right(root)
+                root.deiconify()
+                root.lift()
+                root.attributes("-topmost", True)  # reassert above other windows
+        except Exception as exc:
+            logging.getLogger("PCTimeControl").debug("Overlay refresh error: %s", exc)
+        finally:
+            try:
+                root.after(self._POLL_MS, self._refresh)
+            except Exception:
+                pass  # root is being torn down
+
+
 class WindowsHostPlatform(HostPlatform):
     """Windows session lock, shutdown, messaging, and firewall diagnostics."""
+
+    def __init__(self) -> None:
+        self._time_overlay = _TimeOverlay()
+
+    def update_time_overlay(self, text: str | None) -> None:
+        self._time_overlay.update(text)
 
     def check_session_locked(self) -> bool:
         """

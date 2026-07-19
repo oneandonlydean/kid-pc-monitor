@@ -12,6 +12,7 @@ from datetime import datetime
 from datetime import time as dtime
 from pathlib import Path
 
+from kid_pc_monitor.agent_overlay import overlay_label
 from kid_pc_monitor.agent_state import (
     AgentStateStore,
     DailySettings,
@@ -431,6 +432,18 @@ class PCTimeControl:
             print(f"[{datetime.now():%H:%M:%S}] Warning: {actual_mins} {unit} until lock")
             break
 
+    def update_time_overlay(self) -> None:
+        """Refresh the kid's on-screen countdown.
+
+        Shows minutes remaining for a monitored user with an active limit and
+        hides otherwise. No-op on platforms without an on-screen overlay.
+        """
+        if self.should_monitor_user():
+            label = overlay_label(self.get_time_remaining())
+        else:
+            label = None
+        self.platform.update_time_overlay(label)
+
     def currently_in_lock_window(self):
         """
         Return (locked, reason) for whether the agent should currently be
@@ -482,6 +495,7 @@ class PCTimeControl:
         while True:
             self.tick_accumulator()
             self.check_and_send_warnings()
+            self.update_time_overlay()
 
             locked, reason = self.currently_in_lock_window()
             if locked and not self.check_if_locked():
