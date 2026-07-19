@@ -60,6 +60,8 @@ class _RecordingPlatform(HostPlatform):
     def __init__(self) -> None:
         self.overlay_calls: list[tuple[str | None, bool]] = []
         self.request_handler: Callable[[], None] | None = None
+        self.earn_start: Callable[[], object] | None = None
+        self.earn_award: Callable[[int], int] | None = None
 
     def check_session_locked(self) -> bool:
         return False
@@ -87,6 +89,14 @@ class _RecordingPlatform(HostPlatform):
 
     def set_overlay_request_handler(self, handler: Callable[[], None] | None) -> None:
         self.request_handler = handler
+
+    def set_overlay_earn_handler(
+        self,
+        start_session: Callable[[], object] | None,
+        award: Callable[[int], int] | None,
+    ) -> None:
+        self.earn_start = start_session
+        self.earn_award = award
 
 
 class UpdateTimeOverlayTests(unittest.TestCase):
@@ -168,6 +178,22 @@ class UpdateTimeOverlayTests(unittest.TestCase):
             assert platform.request_handler is not None
             platform.request_handler()  # simulate the kid clicking "Ask for more time"
             self.assertIsNotNone(control.runtime.time_request_at)
+
+    def test_overlay_earn_handlers_registered_and_award(self) -> None:
+        platform = _RecordingPlatform()
+        with tempfile.TemporaryDirectory() as tmp:
+            control = PCTimeControl(
+                platform=platform,
+                data_directory=Path(tmp),
+                start_background_threads=False,
+            )
+            control.daily.earn_enabled = True
+            control.daily.earn_reward_minutes = 5
+            control.daily.earn_daily_cap_minutes = 30
+            assert platform.earn_start is not None
+            assert platform.earn_award is not None
+            self.assertIsNotNone(platform.earn_start())
+            self.assertEqual(platform.earn_award(2), 10)  # 2 correct * 5 min
 
 
 if __name__ == "__main__":

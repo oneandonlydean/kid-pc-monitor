@@ -437,6 +437,46 @@ class PCTimeControlTests(unittest.TestCase):
             self.assertEqual(control._effective_base_allowance(saturday), 60)
             self.assertEqual(control._effective_bed_time(saturday), dtime(21, 0))
 
+    def _earn_control(self, tmp: str) -> PCTimeControl:
+        control = PCTimeControl(
+            platform=FakeHostPlatform(),
+            data_directory=Path(tmp),
+            start_background_threads=False,
+        )
+        control.daily.earn_enabled = True
+        control.daily.earn_reward_minutes = 3
+        control.daily.earn_daily_cap_minutes = 20
+        return control
+
+    def test_award_earned_time_respects_daily_cap(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            control = self._earn_control(tmp)
+            self.assertEqual(control.earn_remaining_minutes(), 20)
+            self.assertEqual(control.award_earned_time(15), 15)
+            self.assertEqual(control.runtime.cumulative_extension_seconds, 15 * 60)
+            # The next award is capped to the 5 minutes left under the cap.
+            self.assertEqual(control.award_earned_time(15), 5)
+            self.assertEqual(control.earn_remaining_minutes(), 0)
+            self.assertEqual(control.award_earned_time(10), 0)
+
+    def test_earn_session_none_when_disabled_or_capped(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            control = self._earn_control(tmp)
+            control.daily.earn_enabled = False
+            self.assertIsNone(control._earn_session())
+            control.daily.earn_enabled = True
+            session = control._earn_session()
+            assert session is not None
+            self.assertEqual(session.reward_minutes, 3)
+            self.assertEqual(session.remaining_minutes, 20)
+            control.runtime.earned_today_seconds = 20 * 60  # cap reached
+            self.assertIsNone(control._earn_session())
+
+    def test_earn_award_grants_reward_per_correct(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            control = self._earn_control(tmp)
+            self.assertEqual(control._earn_award(4), 12)  # 4 correct * 3 min
+
 
 if __name__ == "__main__":
     unittest.main()

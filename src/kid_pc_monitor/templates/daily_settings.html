@@ -76,6 +76,35 @@
             <button class="btn btn-clear" data-action="clear-weekend-bed-time">Remove weekend bedtime</button>
             {% endif %}
         </div>
+
+        <div class="action-group">
+            <div class="action-title">🧠 Earn time (spelling quiz)</div>
+            <p class="hint">
+                Let the kid earn extra minutes by unscrambling words on their PC, up to a daily cap.
+                Earned today: {{ pc_info.get('earned_today', 0) }} min.
+            </p>
+            <label class="weekend-toggle">
+                <input type="checkbox" id="earn-enabled"
+                    {% if pc_info.get('earn_enabled') %}checked{% endif %}>
+                Let the kid earn time by answering spelling questions
+            </label>
+            <button class="btn btn-save" data-action="save-earn-enabled">Save earn on/off</button>
+
+            <p class="hint">Minutes earned per correct answer.</p>
+            <input type="number" id="earn-reward" min="1" max="120"
+                   value="{{ pc_info.get('earn_reward', 5) }}">
+            <button class="btn btn-save" data-action="save-earn-reward">Save reward</button>
+
+            <p class="hint">Number of questions in each quiz.</p>
+            <input type="number" id="earn-questions" min="1" max="20"
+                   value="{{ pc_info.get('earn_questions', 5) }}">
+            <button class="btn btn-save" data-action="save-earn-questions">Save question count</button>
+
+            <p class="hint">Most minutes the kid can earn per day.</p>
+            <input type="number" id="earn-cap" min="0" max="600"
+                   value="{{ pc_info.get('earn_cap', 30) }}">
+            <button class="btn btn-save" data-action="save-earn-cap">Save daily cap</button>
+        </div>
     </div>
 {% endblock %}
 

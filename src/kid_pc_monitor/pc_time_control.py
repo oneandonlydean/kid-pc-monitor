@@ -32,6 +32,7 @@ from kid_pc_monitor.lock_policy import (
     should_monitor_user,
     usage_period_date,
 )
+from kid_pc_monitor.spelling_quiz import EarnSession
 
 # ============================================
 # CONFIGURATION
@@ -117,6 +118,8 @@ class PCTimeControl:
 
         # Let the on-screen overlay's "Ask for more time" button reach us.
         self.platform.set_overlay_request_handler(self.request_more_time)
+        # Wire the overlay's "Earn time" quiz to the reward logic.
+        self.platform.set_overlay_earn_handler(self._earn_session, self._earn_award)
 
         if start_background_threads:
             self.monitor_thread = threading.Thread(target=self.monitor_activity, daemon=True)
@@ -441,6 +444,59 @@ class PCTimeControl:
         """Clear a pending 'more time' request (parent dismissed it)."""
         self.runtime.time_request_at = None
         self.logger.info("Parent action: time request cleared")
+
+    def set_earn_enabled(self, enabled: bool) -> None:
+        self.daily.earn_enabled = enabled
+        self.logger.info("Parent action: earn-time quiz %s", "enabled" if enabled else "disabled")
+
+    def set_earn_reward(self, minutes: int) -> None:
+        self.daily.earn_reward_minutes = max(1, minutes)
+        self.logger.info(
+            "Parent action: earn reward %d min/correct", self.daily.earn_reward_minutes
+        )
+
+    def set_earn_questions(self, count: int) -> None:
+        self.daily.earn_questions = max(1, count)
+        self.logger.info("Parent action: earn quiz length %d questions", self.daily.earn_questions)
+
+    def set_earn_cap(self, minutes: int) -> None:
+        self.daily.earn_daily_cap_minutes = max(0, minutes)
+        self.logger.info("Parent action: earn daily cap %d min", self.daily.earn_daily_cap_minutes)
+
+    def earn_remaining_minutes(self) -> int:
+        """Minutes the kid may still earn today under the daily cap."""
+        earned = self.runtime.earned_today_seconds / 60
+        return max(0, int(self.daily.earn_daily_cap_minutes - earned))
+
+    def award_earned_time(self, minutes: int) -> int:
+        """Grant earned quiz minutes (capped by the daily cap); return minutes given."""
+        granted = min(max(0, minutes), self.earn_remaining_minutes())
+        if granted <= 0:
+            return 0
+        self.runtime.cumulative_extension_seconds += granted * 60
+        self.runtime.earned_today_seconds += granted * 60
+        self.runtime.manual_lock_active = False
+        self.warnings_sent.clear()
+        self.save_state()
+        self.logger.info("Kid earned %d minutes via the spelling quiz", granted)
+        return granted
+
+    def _earn_session(self) -> EarnSession | None:
+        """Describe an available quiz, or None when earning is off or capped."""
+        if not self.should_monitor_user() or not self.daily.earn_enabled:
+            return None
+        remaining = self.earn_remaining_minutes()
+        if remaining <= 0:
+            return None
+        return EarnSession(
+            questions=self.daily.earn_questions,
+            reward_minutes=self.daily.earn_reward_minutes,
+            remaining_minutes=remaining,
+        )
+
+    def _earn_award(self, correct_count: int) -> int:
+        """Grant time for a finished quiz and return the minutes actually awarded."""
+        return self.award_earned_time(correct_count * self.daily.earn_reward_minutes)
 
     def show_message(self, message, title="PC Time Control"):
         """Display a message to the logged-in user (OS-specific UI)."""

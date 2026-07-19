@@ -13,6 +13,9 @@ from kid_pc_monitor.agent_protocol import (
     MAX_BREAK_DURATION,
     MAX_BREAK_INTERVAL,
     MAX_DAILY_LIMIT,
+    MAX_EARN_CAP,
+    MAX_EARN_QUESTIONS,
+    MAX_EARN_REWARD,
     MAX_FRAME_BYTES,
     MIN_DAILY_LIMIT,
     UNKNOWN_ACTION,
@@ -89,6 +92,16 @@ def _read_variable(control: Any, var: str) -> Any:
         return _format_time(control.daily.weekend_bed_time)
     if var == "weekend_allowance":
         return control.daily.weekend_allowance
+    if var == "earn_enabled":
+        return bool(control.daily.earn_enabled)
+    if var == "earn_reward":
+        return int(control.daily.earn_reward_minutes)
+    if var == "earn_questions":
+        return int(control.daily.earn_questions)
+    if var == "earn_cap":
+        return int(control.daily.earn_daily_cap_minutes)
+    if var == "earned_today":
+        return int(control.runtime.earned_today_seconds // 60)
     if var == "wake_time":
         return _format_time(control.daily.wake_time)
     if var == "cumulative_extension":
@@ -176,6 +189,34 @@ def _do_set(control: Any, req: Request) -> list[Node]:
                 req_id,
             )
         control.set_weekend_allowance(minutes)
+        result = minutes
+    elif var == "earn_enabled":
+        enabled = _parse_bool(val, req_id)
+        control.set_earn_enabled(enabled)
+        result = enabled
+    elif var == "earn_reward":
+        minutes = _parse_int(val, req_id)
+        if not (1 <= minutes <= MAX_EARN_REWARD):
+            raise ProtocolError(
+                INVALID_VALUE, f"minutes must be between 1 and {MAX_EARN_REWARD}", req_id
+            )
+        control.set_earn_reward(minutes)
+        result = minutes
+    elif var == "earn_questions":
+        count = _parse_int(val, req_id)
+        if not (1 <= count <= MAX_EARN_QUESTIONS):
+            raise ProtocolError(
+                INVALID_VALUE, f"questions must be between 1 and {MAX_EARN_QUESTIONS}", req_id
+            )
+        control.set_earn_questions(count)
+        result = count
+    elif var == "earn_cap":
+        minutes = _parse_int(val, req_id)
+        if not (0 <= minutes <= MAX_EARN_CAP):
+            raise ProtocolError(
+                INVALID_VALUE, f"minutes must be between 0 and {MAX_EARN_CAP}", req_id
+            )
+        control.set_earn_cap(minutes)
         result = minutes
     else:  # manual_lock
         engaged = _parse_bool(val, req_id)

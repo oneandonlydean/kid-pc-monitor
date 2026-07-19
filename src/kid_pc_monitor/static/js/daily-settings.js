@@ -90,4 +90,48 @@ registerHandlers({
             { button: el, reloadDelay: 1000 }
         );
     },
+    "save-earn-enabled": function (el) {
+        const enabled = document.getElementById("earn-enabled").checked;
+        postAction(
+            { action: "set_earn_enabled", enabled: enabled },
+            { button: el, reloadDelay: 1000 }
+        );
+    },
+    "save-earn-reward": function (el) {
+        const minutes = parsePositiveInt(
+            document.getElementById("earn-reward").value
+        );
+        if (minutes === null) {
+            showStatus("Enter a positive number of minutes", false);
+            return;
+        }
+        postAction(
+            { action: "set_earn_reward", minutes: minutes },
+            { button: el, reloadDelay: 1000 }
+        );
+    },
+    "save-earn-questions": function (el) {
+        const questions = parsePositiveInt(
+            document.getElementById("earn-questions").value
+        );
+        if (questions === null) {
+            showStatus("Enter a positive number of questions", false);
+            return;
+        }
+        postAction(
+            { action: "set_earn_questions", questions: questions },
+            { button: el, reloadDelay: 1000 }
+        );
+    },
+    "save-earn-cap": function (el) {
+        const value = parseInt(document.getElementById("earn-cap").value, 10);
+        if (!Number.isInteger(value) || value < 0) {
+            showStatus("Enter 0 or more minutes for the daily cap", false);
+            return;
+        }
+        postAction(
+            { action: "set_earn_cap", minutes: value },
+            { button: el, reloadDelay: 1000 }
+        );
+    },
 });

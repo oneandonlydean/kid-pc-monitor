@@ -33,6 +33,11 @@ class DailySettings:
     weekend_enabled: bool = False
     weekend_bed_time: dtime | None = None
     weekend_allowance: int | None = None
+    # "Earn time" spelling quiz: kid answers questions to earn extra minutes.
+    earn_enabled: bool = False
+    earn_reward_minutes: int = 5  # minutes granted per correct answer
+    earn_questions: int = 5  # questions per quiz session
+    earn_daily_cap_minutes: int = 30  # most minutes earnable per day
 
 
 @dataclass
@@ -47,6 +52,8 @@ class RuntimeState:
     break_active_until: datetime | None = None
     # accumulated_seconds value at the last break end; usage past it drives the next break.
     break_baseline_seconds: float = 0.0
+    # Minutes-worth of time earned via the spelling quiz today (for the daily cap).
+    earned_today_seconds: int = 0
 
 
 def _format_time(value: dtime) -> str:
@@ -95,6 +102,7 @@ def reset_runtime_for_new_period(runtime: RuntimeState, now: datetime | None = N
     runtime.time_request_at = None
     runtime.break_active_until = None
     runtime.break_baseline_seconds = 0.0
+    runtime.earned_today_seconds = 0
 
 
 def reset_runtime_if_needed(
@@ -121,6 +129,10 @@ def daily_to_dict(daily: DailySettings) -> dict:
             _format_time(daily.weekend_bed_time) if daily.weekend_bed_time is not None else None
         ),
         "weekend_allowance": daily.weekend_allowance,
+        "earn_enabled": daily.earn_enabled,
+        "earn_reward_minutes": daily.earn_reward_minutes,
+        "earn_questions": daily.earn_questions,
+        "earn_daily_cap_minutes": daily.earn_daily_cap_minutes,
     }
     if daily.bed_time is not None:
         payload["bed_time"] = _format_time(daily.bed_time)
@@ -146,6 +158,7 @@ def runtime_to_dict(runtime: RuntimeState) -> dict:
             else None
         ),
         "break_baseline_seconds": round(runtime.break_baseline_seconds, 3),
+        "earned_today_seconds": int(runtime.earned_today_seconds),
     }
 
 
@@ -183,6 +196,10 @@ def load_daily_from_dict(data: dict) -> DailySettings:
         weekend_enabled=bool(data.get("weekend_enabled", False)),
         weekend_bed_time=weekend_bed_time,
         weekend_allowance=weekend_allowance,
+        earn_enabled=bool(data.get("earn_enabled", False)),
+        earn_reward_minutes=int(data.get("earn_reward_minutes", 5) or 5),
+        earn_questions=int(data.get("earn_questions", 5) or 5),
+        earn_daily_cap_minutes=int(data.get("earn_daily_cap_minutes", 30) or 30),
     )
 
 
@@ -242,6 +259,7 @@ def load_runtime_from_dict(data: dict) -> RuntimeState:
         time_request_at=time_request_at,
         break_active_until=break_active_until,
         break_baseline_seconds=float(data.get("break_baseline_seconds", 0.0)),
+        earned_today_seconds=int(data.get("earned_today_seconds", 0) or 0),
     )
 
 

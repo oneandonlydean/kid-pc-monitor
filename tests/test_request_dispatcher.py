@@ -156,6 +156,25 @@ class DispatchTests(unittest.TestCase):
             self.assertIsNone(control.daily.weekend_allowance)
             self.assertIsNone(control.daily.weekend_bed_time)
 
+    def test_earn_config_get_and_set(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            control = self._control(tmp, hostname="kid-pc")
+            self.assertIs(self._dispatch_ok(control, action="get", var="earn_enabled"), False)
+            self.assertIs(
+                self._dispatch_ok(control, action="set", var="earn_enabled", val=True), True
+            )
+            self.assertEqual(
+                self._dispatch_ok(control, action="set", var="earn_reward", val=10), 10
+            )
+            self.assertEqual(
+                self._dispatch_ok(control, action="set", var="earn_questions", val=8), 8
+            )
+            self.assertEqual(self._dispatch_ok(control, action="set", var="earn_cap", val=45), 45)
+            self.assertEqual(control.daily.earn_reward_minutes, 10)
+            self.assertEqual(control.daily.earn_questions, 8)
+            self.assertEqual(control.daily.earn_daily_cap_minutes, 45)
+            self.assertEqual(self._dispatch_ok(control, action="get", var="earned_today"), 0)
+
     def test_break_interval_rejects_out_of_range(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             control = self._control(tmp, hostname="kid-pc")

@@ -6,6 +6,7 @@ import logging
 import sys
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from typing import Any
 
 
 class HostPlatform(ABC):
@@ -51,6 +52,19 @@ class HostPlatform(ABC):
     def set_overlay_request_handler(self, handler: Callable[[], None] | None) -> None:
         """Register the callback invoked when the kid clicks the overlay's
         "Ask for more time" button. Default is a no-op."""
+        return
+
+    def set_overlay_earn_handler(
+        self,
+        start_session: Callable[[], Any] | None,
+        award: Callable[[int], int] | None,
+    ) -> None:
+        """Register the overlay's "Earn time" quiz callbacks.
+
+        ``start_session()`` returns an ``EarnSession`` describing an available
+        quiz (or ``None`` when earning is off or the daily cap is reached);
+        ``award(correct_count)`` grants time and returns the minutes given.
+        Default is a no-op."""
         return
 
     def log_connectivity_diagnostics(

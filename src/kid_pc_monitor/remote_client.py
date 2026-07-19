@@ -412,6 +412,14 @@ def action_request_fields(
         if minutes is None or minutes == "":
             return "clear", "weekend_allowance", None, None
         return "set", "weekend_allowance", int(minutes), None
+    if action_name == "set_earn_enabled":
+        return "set", "earn_enabled", bool(p.get("enabled")), None
+    if action_name == "set_earn_reward":
+        return "set", "earn_reward", int(p["minutes"]), None
+    if action_name == "set_earn_questions":
+        return "set", "earn_questions", int(p["questions"]), None
+    if action_name == "set_earn_cap":
+        return "set", "earn_cap", int(p["minutes"]), None
     if action_name == "clear_usage_limit":
         return "clear", "daily_limit", None, None
     if action_name == "get_logs":
@@ -646,6 +654,11 @@ def settings_to_pc_info(
         "weekend_enabled": bool(settings.get("weekend_enabled")),
         "weekend_bed_time": settings.get("weekend_bed_time"),
         "weekend_allowance": settings.get("weekend_allowance"),
+        "earn_enabled": bool(settings.get("earn_enabled")),
+        "earn_reward": int(settings.get("earn_reward") or 5),
+        "earn_questions": int(settings.get("earn_questions") or 5),
+        "earn_cap": int(settings.get("earn_cap") or 30),
+        "earned_today": int(settings.get("earned_today") or 0),
         "manual_lock_active": manual_lock_active,
         "enforcement_active": enforcement_active,
         "enforcement_reason": enforcement_reason,

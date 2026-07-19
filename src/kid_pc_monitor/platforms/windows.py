@@ -20,6 +20,8 @@ if TYPE_CHECKING:
     import tkinter as tk
     from collections.abc import Callable
 
+    from kid_pc_monitor.spelling_quiz import EarnSession
+
 # Must match scripts/install.py FIREWALL_RULE_DISPLAY_NAME
 _FIREWALL_RULE_DISPLAY_NAME = "Kid PC Monitor Agent (TCP 9999)"
 _INVALID_HANDLE_VALUE = ctypes.c_size_t(-1).value
@@ -231,12 +233,25 @@ class _TimeOverlay:
         self._root: tk.Tk | None = None
         self._label: tk.Label | None = None
         self._button: tk.Button | None = None
+        self._earn_button: tk.Button | None = None
         self._on_request: Callable[[], None] | None = None
+        self._earn_start: Callable[[], EarnSession | None] | None = None
+        self._earn_award: Callable[[int], int] | None = None
 
     def set_request_handler(self, handler: Callable[[], None] | None) -> None:
         """Set the callback invoked when the kid clicks 'Ask for more time'."""
         with self._lock:
             self._on_request = handler
+
+    def set_earn_handler(
+        self,
+        start_session: Callable[[], EarnSession | None] | None,
+        award: Callable[[int], int] | None,
+    ) -> None:
+        """Set the callbacks for the 'Earn time' spelling quiz."""
+        with self._lock:
+            self._earn_start = start_session
+            self._earn_award = award
 
     def update(self, text: str | None, urgent: bool = False) -> None:
         """Publish the text/urgency to display (or ``None`` to hide); start UI lazily."""
@@ -287,10 +302,24 @@ class _TimeOverlay:
                 cursor="hand2",
                 command=self._handle_request_click,
             )
-            button.pack(fill="x", padx=6, pady=(0, 6))
+            button.pack(fill="x", padx=6, pady=(0, 4))
+            earn_button = tk.Button(
+                root,
+                text="Earn time (spelling)",
+                font=("Segoe UI", 9),
+                relief="flat",
+                bg="#2e7d32",
+                fg="#ffffff",
+                activebackground="#1b5e20",
+                activeforeground="#ffffff",
+                cursor="hand2",
+                command=self._handle_earn_click,
+            )
+            earn_button.pack(fill="x", padx=6, pady=(0, 6))
             self._root = root
             self._label = label
             self._button = button
+            self._earn_button = earn_button
             root.after(self._POLL_MS, self._refresh)
             root.mainloop()
         except Exception as exc:
@@ -322,6 +351,84 @@ class _TimeOverlay:
             except Exception:
                 pass
 
+    def _refresh_earn_button(self) -> None:
+        """Enable the Earn button only when a quiz is currently available."""
+        button = self._earn_button
+        if button is None:
+            return
+        available = False
+        with self._lock:
+            start = self._earn_start
+        if start is not None:
+            try:
+                available = start() is not None
+            except Exception:
+                available = False
+        try:
+            button.config(state="normal" if available else "disabled")
+        except Exception:
+            pass
+
+    def _handle_earn_click(self) -> None:
+        with self._lock:
+            start = self._earn_start
+            award = self._earn_award
+        root = self._root
+        if start is None or award is None or root is None:
+            return
+        try:
+            import tkinter.messagebox as messagebox
+            import tkinter.simpledialog as simpledialog
+
+            from kid_pc_monitor import spelling_quiz
+        except Exception as exc:
+            logging.getLogger("PCTimeControl").error("Quiz UI unavailable: %s", exc)
+            return
+
+        session = start()
+        if session is None:
+            messagebox.showinfo(
+                "Earn time", "Earning extra time isn't available right now.", parent=root
+            )
+            return
+
+        from random import Random
+
+        items = spelling_quiz.generate_quiz(session.questions, Random())
+        messagebox.showinfo(
+            "Earn time",
+            f"Spell {len(items)} words to earn up to {session.remaining_minutes} minutes.\n"
+            f"Each correct answer is worth {session.reward_minutes} minute(s).",
+            parent=root,
+        )
+        correct = 0
+        for index, item in enumerate(items, start=1):
+            response = simpledialog.askstring(
+                "Earn time",
+                f"Question {index} of {len(items)}\n\n"
+                "Unscramble these letters to spell a word:\n\n"
+                f"    {item.scrambled}",
+                parent=root,
+            )
+            if response is None:
+                break  # kid cancelled the quiz
+            if spelling_quiz.is_correct(item.answer, response):
+                correct += 1
+
+        awarded = award(correct)
+        if awarded > 0:
+            messagebox.showinfo(
+                "Earn time",
+                f"Great job! You got {correct} right and earned {awarded} minute(s).",
+                parent=root,
+            )
+        else:
+            messagebox.showinfo(
+                "Earn time",
+                f"You got {correct} right. No minutes earned this time.",
+                parent=root,
+            )
+
     def _place_top_right(self, root: tk.Tk) -> None:
         root.update_idletasks()
         width = root.winfo_width()
@@ -350,6 +457,7 @@ class _TimeOverlay:
                 root.deiconify()
                 root.lift()
                 root.attributes("-topmost", True)  # reassert above other windows
+                self._refresh_earn_button()
         except Exception as exc:
             logging.getLogger("PCTimeControl").debug("Overlay refresh error: %s", exc)
         finally:
@@ -370,6 +478,13 @@ class WindowsHostPlatform(HostPlatform):
 
     def set_overlay_request_handler(self, handler: Callable[[], None] | None) -> None:
         self._time_overlay.set_request_handler(handler)
+
+    def set_overlay_earn_handler(
+        self,
+        start_session: Callable[[], EarnSession | None] | None,
+        award: Callable[[int], int] | None,
+    ) -> None:
+        self._time_overlay.set_earn_handler(start_session, award)
 
     def check_session_locked(self) -> bool:
         """
