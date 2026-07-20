@@ -1129,6 +1129,18 @@ def enable_auto_update():
     python_path = find_system_python() or sys.executable
     repo = repo_root_dir()
     script = os.path.join(repo, "scripts", "install.py")
+
+    # The task runs as SYSTEM, so Git would otherwise refuse to touch a repo owned
+    # by a normal user ("detected dubious ownership"). Trust it system-wide.
+    try:
+        subprocess.run(
+            ["git", "config", "--system", "--add", "safe.directory", repo],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        pass  # git not found here; the manual updater still works
     ps_script = f"""
     $ErrorActionPreference = 'Stop'
     try {{
