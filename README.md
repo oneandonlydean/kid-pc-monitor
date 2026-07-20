@@ -460,10 +460,11 @@ bank.
 ### On-screen timer detail (this fork)
 
 Under the **Time left** countdown, the overlay shows the budgets behind that
-number: the **bedtime** (with a live countdown to it) and the **allowance left**
-for the day, which notes how many banked carry-over minutes are included. The
-headline is always whichever limit — bedtime or allowance — comes first, so the
-child can see at a glance why time is running out.
+number: the **bedtime** (with a live countdown to it), the **allowance left** for
+the day, and — when carry-over is on — a **Saved** line with the child's banked
+balance, so they can watch it grow. The headline is always whichever limit —
+bedtime or allowance — comes first, so the child can see at a glance why time is
+running out.
 
 ### Usage history chart (this fork)
 

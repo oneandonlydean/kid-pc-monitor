@@ -63,14 +63,16 @@ def overlay_detail_lines(
     bed_time: dtime | None = None,
     minutes_until_bedtime: float | None = None,
     allowance_minutes_left: float | None = None,
+    carryover_enabled: bool = False,
     carryover_minutes: int = 0,
 ) -> list[str]:
     """Break the headline countdown down into the budgets that produced it.
 
-    Returns a bedtime line (clock time plus a live countdown to it) and an
-    allowance line (time left in today's screen-time budget, noting how much of
-    it came from banked carry-over). Either is omitted when it does not apply,
-    so a kid with only a bedtime and no daily cap sees just the one line.
+    Returns a bedtime line (clock time plus a live countdown to it), an allowance
+    line (time left in today's screen-time budget), and — when carry-over is
+    enabled — a banked-balance line so the kid can watch their saved time. Any
+    line that does not apply is omitted, so a kid with only a bedtime and no daily
+    cap sees just the one line.
     """
     lines: list[str] = []
 
@@ -81,10 +83,10 @@ def overlay_detail_lines(
         lines.append(label)
 
     if allowance_minutes_left is not None:
-        label = f"Allowance left: {format_duration(max(0.0, allowance_minutes_left))}"
-        if carryover_minutes > 0:
-            label += f" (incl. {carryover_minutes} min saved)"
-        lines.append(label)
+        lines.append(f"Allowance left: {format_duration(max(0.0, allowance_minutes_left))}")
+
+    if carryover_enabled:
+        lines.append(f"Saved: {max(0, carryover_minutes)} min")
 
     return lines
 
@@ -96,6 +98,7 @@ def overlay_state(
     bed_time: dtime | None = None,
     minutes_until_bedtime: float | None = None,
     allowance_minutes_left: float | None = None,
+    carryover_enabled: bool = False,
     carryover_minutes: int = 0,
 ) -> OverlayState | None:
     """Return the overlay text, urgency, and detail, or ``None`` when nothing shows.
@@ -112,6 +115,7 @@ def overlay_state(
         bed_time=bed_time,
         minutes_until_bedtime=minutes_until_bedtime,
         allowance_minutes_left=allowance_minutes_left,
+        carryover_enabled=carryover_enabled,
         carryover_minutes=carryover_minutes,
     )
     return OverlayState(

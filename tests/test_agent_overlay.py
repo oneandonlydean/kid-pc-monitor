@@ -133,11 +133,18 @@ class OverlayDetailLinesTests(unittest.TestCase):
             ["Allowance left: 35:30"],
         )
 
-    def test_allowance_line_notes_carryover(self) -> None:
+    def test_saved_line_shown_when_carryover_enabled(self) -> None:
         self.assertEqual(
-            overlay_detail_lines(allowance_minutes_left=50, carryover_minutes=20),
-            ["Allowance left: 50:00 (incl. 20 min saved)"],
+            overlay_detail_lines(carryover_enabled=True, carryover_minutes=20),
+            ["Saved: 20 min"],
         )
+
+    def test_saved_line_shows_zero_when_enabled_but_empty(self) -> None:
+        # A stable readout the kid can watch grow, even before anything is banked.
+        self.assertEqual(overlay_detail_lines(carryover_enabled=True), ["Saved: 0 min"])
+
+    def test_saved_line_hidden_when_carryover_disabled(self) -> None:
+        self.assertEqual(overlay_detail_lines(carryover_minutes=20), [])
 
     def test_negative_allowance_floors_at_zero(self) -> None:
         self.assertEqual(
@@ -145,16 +152,17 @@ class OverlayDetailLinesTests(unittest.TestCase):
             ["Allowance left: 0:01"],
         )
 
-    def test_both_lines_together(self) -> None:
+    def test_all_lines_together(self) -> None:
         lines = overlay_detail_lines(
             bed_time=dtime(20, 30),
             minutes_until_bedtime=72,
             allowance_minutes_left=35,
+            carryover_enabled=True,
             carryover_minutes=10,
         )
         self.assertEqual(
             lines,
-            ["Bedtime 20:30 — in 1:12:00", "Allowance left: 35:00 (incl. 10 min saved)"],
+            ["Bedtime 20:30 — in 1:12:00", "Allowance left: 35:00", "Saved: 10 min"],
         )
 
 
@@ -289,9 +297,9 @@ class UpdateTimeOverlayTests(unittest.TestCase):
             with mock.patch("kid_pc_monitor.pc_time_control.datetime") as dt:
                 dt.now.return_value = now
                 control.update_time_overlay()
-        # 60 base + 20 banked, nothing used yet.
+        # 60 base + 20 banked, nothing used yet; the bank shows on its own line.
         self.assertEqual(platform.overlay_calls, [("Time left: 1:20:00", False)])
-        self.assertEqual(platform.detail_calls, ["Allowance left: 1:20:00 (incl. 20 min saved)"])
+        self.assertEqual(platform.detail_calls, ["Allowance left: 1:20:00\nSaved: 20 min"])
 
     def test_hidden_for_exempt_user(self) -> None:
         platform = _RecordingPlatform()

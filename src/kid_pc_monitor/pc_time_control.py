@@ -673,7 +673,8 @@ class PCTimeControl:
             bed_time=bed_time,
             minutes_until_bedtime=minutes_until_bedtime(now, bed_time),
             allowance_minutes_left=self.allowance_minutes_left(now),
-            carryover_minutes=self.carryover_minutes() if self.daily.carryover_enabled else 0,
+            carryover_enabled=self.daily.carryover_enabled,
+            carryover_minutes=self.carryover_minutes(),
         )
         if state is None:
             self.platform.update_time_overlay(None)
