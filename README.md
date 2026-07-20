@@ -19,7 +19,7 @@ DIY parental control system for tech-savvy parents. If you know what 'pip instal
 - **💾 Persistent settings** - Limits survive PC restarts
 - **👤 User-specific restrictions** - Monitor only specific Windows accounts
 - **📊 Real-time status** - See current limits and time remaining
-- **⏳ On-screen countdown** - Kids always see the time left today; it turns red in the final minutes (can be hidden per PC)
+- **⏳ On-screen countdown** - Live ticking timer of the time left today; turns red in the final minutes; kids can move it to any corner or a second screen (can be hidden per PC)
 - **🧍 Break reminders** - Force a stretch break for a few minutes after a set amount of continuous use
 - **🙋 Request more time** - Kids ask for more time from their screen; you approve or dismiss from your phone
 - **🎁 One-tap bonus time** - Grant +15/+30 minutes straight from the dashboard, no drilling in
@@ -365,10 +365,12 @@ you clear all limits.
 
 ### On-screen timer (this fork)
 
-By default the kid's PC shows a small always-on-top countdown of the time left
-today. It turns **red in the final few minutes** before a lock. On a PC's
-control page, use **⏳ On-Screen Timer → Show/Hide** to turn it off or on per
-PC.
+By default the kid's PC shows a small always-on-top **live countdown** of the
+time left today (a ticking `M:SS`). It turns **red in the final few minutes**
+before a lock. The child can click **Move ▾** on the overlay to send it to any
+corner of the screen — or to a **second monitor** — and the choice is
+remembered. On a PC's control page, use **⏳ On-Screen Timer → Show/Hide** to
+turn it off or on per PC.
 
 ### Break reminders (this fork)
 

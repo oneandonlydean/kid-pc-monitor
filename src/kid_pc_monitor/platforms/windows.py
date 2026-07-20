@@ -11,8 +11,10 @@ import subprocess
 import sys
 import threading
 from ctypes import wintypes
+from pathlib import Path
 from typing import TYPE_CHECKING
 
+from kid_pc_monitor.agent_overlay import VALID_CORNERS, corner_geometry
 from kid_pc_monitor.host_platform import HostPlatform
 from kid_pc_monitor.network import get_primary_ipv4
 
@@ -234,7 +236,13 @@ class _TimeOverlay:
         self._label: tk.Label | None = None
         self._button: tk.Button | None = None
         self._earn_button: tk.Button | None = None
+        self._move_button: tk.Button | None = None
         self._on_request: Callable[[], None] | None = None
+        # Kid-chosen position (persisted locally, independent of parent settings).
+        self._corner = "top-right"
+        self._monitor = 0
+        self._monitors: list[tuple[int, int, int, int]] = []
+        self._placed_key: tuple[str, int, int, int] | None = None
         self._earn_start: Callable[[], EarnSession | None] | None = None
         self._earn_award: Callable[[int], int] | None = None
 
@@ -315,11 +323,28 @@ class _TimeOverlay:
                 cursor="hand2",
                 command=self._handle_earn_click,
             )
-            earn_button.pack(fill="x", padx=6, pady=(0, 6))
+            earn_button.pack(fill="x", padx=6, pady=(0, 4))
+            move_button = tk.Button(
+                root,
+                text="Move ▾",
+                font=("Segoe UI", 8),
+                relief="flat",
+                bg="#2a2a2a",
+                fg="#cccccc",
+                activebackground="#3a3a3a",
+                activeforeground="#ffffff",
+                cursor="hand2",
+                command=self._handle_move_click,
+            )
+            move_button.pack(fill="x", padx=6, pady=(0, 6))
             self._root = root
             self._label = label
             self._button = button
             self._earn_button = earn_button
+            self._move_button = move_button
+            self._load_position()
+            self._monitors = self._enumerate_monitors(root)
+            self._place(root, force=True)
             root.after(self._POLL_MS, self._refresh)
             root.mainloop()
         except Exception as exc:
@@ -429,12 +454,120 @@ class _TimeOverlay:
                 parent=root,
             )
 
-    def _place_top_right(self, root: tk.Tk) -> None:
+    def _pos_path(self) -> Path:
+        base = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "KidPCMonitor"
+        return base / "overlay_pos.json"
+
+    def _load_position(self) -> None:
+        try:
+            data = json.loads(self._pos_path().read_text(encoding="utf-8"))
+        except Exception:
+            return
+        corner = data.get("corner")
+        if corner in VALID_CORNERS:
+            self._corner = corner
+        monitor = data.get("monitor")
+        if isinstance(monitor, int) and monitor >= 0:
+            self._monitor = monitor
+
+    def _save_position(self) -> None:
+        try:
+            path = self._pos_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                json.dumps({"corner": self._corner, "monitor": self._monitor}),
+                encoding="utf-8",
+            )
+        except Exception as exc:
+            logging.getLogger("PCTimeControl").debug("Could not save overlay position: %s", exc)
+
+    def _enumerate_monitors(self, root: tk.Tk) -> list[tuple[int, int, int, int]]:
+        """Return each monitor's (left, top, right, bottom); falls back to primary."""
+        rects: list[tuple[int, int, int, int]] = []
+        try:
+            enum_proc = ctypes.WINFUNCTYPE(
+                ctypes.c_int,
+                ctypes.c_void_p,
+                ctypes.c_void_p,
+                ctypes.POINTER(wintypes.RECT),
+                ctypes.c_void_p,
+            )
+
+            def _callback(_hmon, _hdc, lprc, _lparam) -> int:
+                r = lprc.contents
+                rects.append((int(r.left), int(r.top), int(r.right), int(r.bottom)))
+                return 1
+
+            ctypes.windll.user32.EnumDisplayMonitors(0, 0, enum_proc(_callback), 0)
+        except Exception as exc:
+            logging.getLogger("PCTimeControl").debug("Monitor enumeration failed: %s", exc)
+        if rects:
+            return rects
+        try:
+            return [(0, 0, root.winfo_screenwidth(), root.winfo_screenheight())]
+        except Exception:
+            return [(0, 0, 1920, 1080)]
+
+    def _current_monitor_rect(self, root: tk.Tk) -> tuple[int, int, int, int]:
+        monitors = self._monitors
+        if monitors and 0 <= self._monitor < len(monitors):
+            return monitors[self._monitor]
+        if monitors:
+            return monitors[0]
+        return (0, 0, root.winfo_screenwidth(), root.winfo_screenheight())
+
+    def _place(self, root: tk.Tk, *, force: bool = False) -> None:
         root.update_idletasks()
         width = root.winfo_width()
-        screen_width = root.winfo_screenwidth()
-        x = max(0, screen_width - width - 20)
-        root.geometry(f"+{x}+20")
+        height = root.winfo_height()
+        key = (self._corner, self._monitor, width, height)
+        if not force and key == self._placed_key:
+            return
+        x, y = corner_geometry(self._corner, self._current_monitor_rect(root), width, height)
+        root.geometry(f"+{x}+{y}")
+        self._placed_key = key
+
+    def _handle_move_click(self) -> None:
+        import tkinter as tk
+
+        root = self._root
+        button = self._move_button
+        if root is None or button is None:
+            return
+        self._monitors = self._enumerate_monitors(root)
+        menu = tk.Menu(root, tearoff=0)
+        for label, corner in (
+            ("Top-left", "top-left"),
+            ("Top-right", "top-right"),
+            ("Bottom-left", "bottom-left"),
+            ("Bottom-right", "bottom-right"),
+        ):
+            mark = "● " if corner == self._corner else "   "
+            menu.add_command(label=mark + label, command=lambda c=corner: self._set_corner(c))
+        if len(self._monitors) > 1:
+            menu.add_separator()
+            for index in range(len(self._monitors)):
+                mark = "● " if index == self._monitor else "   "
+                menu.add_command(
+                    label=f"{mark}Screen {index + 1}",
+                    command=lambda i=index: self._set_monitor(i),
+                )
+        try:
+            menu.tk_popup(button.winfo_rootx(), button.winfo_rooty() + button.winfo_height())
+        finally:
+            menu.grab_release()
+
+    def _set_corner(self, corner: str) -> None:
+        self._corner = corner
+        self._save_position()
+        if self._root is not None:
+            self._place(self._root, force=True)
+
+    def _set_monitor(self, index: int) -> None:
+        self._monitor = index
+        self._save_position()
+        if self._root is not None:
+            self._place(self._root, force=True)
 
     def _refresh(self) -> None:
         root = self._root
@@ -453,7 +586,7 @@ class _TimeOverlay:
                 if label.cget("text") != text or label.cget("bg") != bg:
                     label.config(text=text, bg=bg, fg=fg)
                     root.configure(bg=bg)
-                    self._place_top_right(root)
+                self._place(root)
                 root.deiconify()
                 root.lift()
                 root.attributes("-topmost", True)  # reassert above other windows
@@ -551,13 +684,15 @@ class WindowsHostPlatform(HostPlatform):
                 root.withdraw()
                 root.attributes("-topmost", True)
                 root.after(60000, root.destroy)
-                messagebox.showwarning(title, message)
+                # parent=root is essential: without it the dialog attaches to the
+                # process default root — the persistent countdown overlay, on
+                # another thread — and tears it down when the dialog closes.
+                messagebox.showwarning(title, message, parent=root)
             except Exception as exc:
                 logging.getLogger("PCTimeControl").error("Error showing message: %s", exc)
             finally:
                 if root:
                     try:
-                        root.quit()
                         root.destroy()
                     except Exception:
                         pass

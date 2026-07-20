@@ -7,9 +7,34 @@ import unittest
 from collections.abc import Callable
 from pathlib import Path
 
-from kid_pc_monitor.agent_overlay import overlay_label, overlay_state
+from kid_pc_monitor.agent_overlay import corner_geometry, overlay_label, overlay_state
 from kid_pc_monitor.host_platform import HostPlatform
 from kid_pc_monitor.pc_time_control import PCTimeControl
+
+
+class CornerGeometryTests(unittest.TestCase):
+    PRIMARY = (0, 0, 1920, 1080)
+
+    def test_four_corners_on_primary(self) -> None:
+        self.assertEqual(corner_geometry("top-left", self.PRIMARY, 200, 120), (20, 20))
+        self.assertEqual(corner_geometry("top-right", self.PRIMARY, 200, 120), (1700, 20))
+        self.assertEqual(corner_geometry("bottom-left", self.PRIMARY, 200, 120), (20, 940))
+        self.assertEqual(corner_geometry("bottom-right", self.PRIMARY, 200, 120), (1700, 940))
+
+    def test_second_monitor_offset(self) -> None:
+        second = (1920, 0, 3840, 1080)
+        self.assertEqual(corner_geometry("top-right", second, 200, 120), (3620, 20))
+        self.assertEqual(corner_geometry("top-left", second, 200, 120), (1940, 20))
+
+    def test_unknown_corner_falls_back_to_top_right(self) -> None:
+        self.assertEqual(
+            corner_geometry("middle", self.PRIMARY, 200, 120),
+            corner_geometry("top-right", self.PRIMARY, 200, 120),
+        )
+
+    def test_clamped_to_monitor_top_left(self) -> None:
+        # A window taller/wider than the monitor stays pinned to the top-left.
+        self.assertEqual(corner_geometry("bottom-right", self.PRIMARY, 4000, 2000), (0, 0))
 
 
 class OverlayLabelTests(unittest.TestCase):
@@ -20,16 +45,17 @@ class OverlayLabelTests(unittest.TestCase):
         self.assertIsNone(overlay_label(0))
         self.assertIsNone(overlay_label(-3))
 
-    def test_rounds_up_to_whole_minutes(self) -> None:
-        self.assertEqual(overlay_label(0.2), "Time left: 1 min")
-        self.assertEqual(overlay_label(44.1), "Time left: 45 min")
+    def test_shows_a_live_seconds_countdown(self) -> None:
+        self.assertEqual(overlay_label(45), "Time left: 45:00")
+        self.assertEqual(overlay_label(44.1), "Time left: 44:06")
+        self.assertEqual(overlay_label(0.2), "Time left: 0:12")
 
-    def test_exact_minute(self) -> None:
-        self.assertEqual(overlay_label(45), "Time left: 45 min")
+    def test_at_least_one_second_while_positive(self) -> None:
+        self.assertEqual(overlay_label(0.001), "Time left: 0:01")
 
-    def test_hours_and_minutes(self) -> None:
-        self.assertEqual(overlay_label(60), "Time left: 1h 00m")
-        self.assertEqual(overlay_label(125), "Time left: 2h 05m")
+    def test_hours_use_h_mm_ss(self) -> None:
+        self.assertEqual(overlay_label(60), "Time left: 1:00:00")
+        self.assertEqual(overlay_label(125), "Time left: 2:05:00")
 
 
 class OverlayStateTests(unittest.TestCase):
@@ -40,7 +66,7 @@ class OverlayStateTests(unittest.TestCase):
     def test_not_urgent_with_plenty_of_time(self) -> None:
         state = overlay_state(45)
         assert state is not None
-        self.assertEqual(state.text, "Time left: 45 min")
+        self.assertEqual(state.text, "Time left: 45:00")
         self.assertFalse(state.urgent)
 
     def test_urgent_within_final_five_minutes(self) -> None:
@@ -111,7 +137,7 @@ class UpdateTimeOverlayTests(unittest.TestCase):
             control.set_daily_allowance(90)
             control.runtime.accumulated_seconds = 30 * 60  # 30 min used -> 60 left
             control.update_time_overlay()
-        self.assertEqual(platform.overlay_calls, [("Time left: 1h 00m", False)])
+        self.assertEqual(platform.overlay_calls, [("Time left: 1:00:00", False)])
 
     def test_forwards_urgent_when_few_minutes_left(self) -> None:
         platform = _RecordingPlatform()
@@ -124,7 +150,7 @@ class UpdateTimeOverlayTests(unittest.TestCase):
             control.set_daily_allowance(90)
             control.runtime.accumulated_seconds = 87 * 60  # 3 min left -> urgent
             control.update_time_overlay()
-        self.assertEqual(platform.overlay_calls, [("Time left: 3 min", True)])
+        self.assertEqual(platform.overlay_calls, [("Time left: 3:00", True)])
 
     def test_hidden_for_exempt_user(self) -> None:
         platform = _RecordingPlatform()
