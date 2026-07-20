@@ -439,6 +439,10 @@ class _TimeOverlay:
             root.title("PC Time Control")
             root.overrideredirect(True)  # borderless — no title bar to click away
             root.attributes("-topmost", True)
+            # Ignore window-close requests (Alt+F4, "End task" close) so a child
+            # can't dismiss the timer. Enforcement is independent, but the kid
+            # should always see the countdown; hiding is done via withdraw().
+            root.protocol("WM_DELETE_WINDOW", lambda: None)
             root.configure(bg=self._NORMAL_BG)
             try:
                 root.attributes("-alpha", 0.9)
@@ -526,7 +530,15 @@ class _TimeOverlay:
             self._monitors = self._enumerate_monitors(root)
             self._place(root, force=True)
             root.after(self._POLL_MS, self._refresh)
-            root.mainloop()
+            try:
+                root.mainloop()
+            finally:
+                # If the window is ever torn down (a forced close, a Tk crash),
+                # let the next update() from the monitor loop relaunch it so the
+                # kid never permanently loses the timer.
+                self._root = None
+                with self._lock:
+                    self._started = False
         except Exception as exc:
             logger.error("On-screen timer crashed: %s", exc, exc_info=True)
 
