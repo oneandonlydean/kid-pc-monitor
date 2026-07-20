@@ -19,8 +19,9 @@ from kid_pc_monitor.agent_state import (
     RuntimeState,
     effective_daily_allowance_minutes,
     reset_runtime_for_new_period,
-    reset_runtime_if_needed,
+    roll_over_if_needed,
 )
+from kid_pc_monitor.earn_quiz import EarnSession
 from kid_pc_monitor.host_platform import HostPlatform, get_default_platform
 from kid_pc_monitor.lock_policy import (
     DEFAULT_WAKE_TIME,
@@ -32,7 +33,6 @@ from kid_pc_monitor.lock_policy import (
     should_monitor_user,
     usage_period_date,
 )
-from kid_pc_monitor.spelling_quiz import EarnSession
 
 # ============================================
 # CONFIGURATION
@@ -221,9 +221,12 @@ class PCTimeControl:
         return self.daily.bed_time
 
     def _effective_base_allowance(self, now: datetime) -> int | None:
-        if self._is_weekend(now):
-            return self.daily.weekend_allowance
-        return self.daily.allowance
+        base = self.daily.weekend_allowance if self._is_weekend(now) else self.daily.allowance
+        if base is None:
+            return None
+        if self.daily.carryover_enabled:
+            base += int(self.runtime.carryover_seconds // 60)
+        return base
 
     def _effective_usage_allowance_minutes(self, now: datetime | None = None) -> float | None:
         now = now or datetime.now()
@@ -237,7 +240,7 @@ class PCTimeControl:
         now = now or datetime.now()
         used_minutes = self.runtime.accumulated_seconds / 60
         extension_seconds = self.runtime.cumulative_extension_seconds
-        if not reset_runtime_if_needed(self.runtime, self.daily.wake_time, now):
+        if not roll_over_if_needed(self.daily, self.runtime, now):
             return False
         self.logger.info(
             "Wake-time rollover (%02d:%02d): resetting daily runtime state "
@@ -401,6 +404,27 @@ class PCTimeControl:
             self.logger.info("Parent action: daily limit cleared")
         else:
             self.logger.info("Parent action: daily limit set to %d minutes", minutes)
+
+    def reset_today_balance(self) -> None:
+        """Reset today's used time to zero, keeping the carry-over bank intact."""
+        self.runtime.accumulated_seconds = 0.0
+        self.last_tick_at = None
+        self.warnings_sent.clear()
+        self.logger.info("Parent action: today's usage reset (carry-over preserved)")
+
+    def set_carryover_enabled(self, enabled: bool) -> None:
+        self.daily.carryover_enabled = enabled
+        self.logger.info("Parent action: carry-over %s", "enabled" if enabled else "disabled")
+
+    def set_carryover_max_days(self, days: int) -> None:
+        self.daily.carryover_max_days = max(0, days)
+        self.logger.info(
+            "Parent action: carry-over cap set to %d days", self.daily.carryover_max_days
+        )
+
+    def carryover_minutes(self) -> int:
+        """Minutes currently banked from unused allowance."""
+        return int(self.runtime.carryover_seconds // 60)
 
     def set_weekend_enabled(self, enabled: bool) -> None:
         """Turn the separate Saturday/Sunday schedule on or off."""

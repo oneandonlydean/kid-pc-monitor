@@ -134,4 +134,22 @@ registerHandlers({
             { button: el, reloadDelay: 1000 }
         );
     },
+    "save-carryover-enabled": function (el) {
+        const enabled = document.getElementById("carryover-enabled").checked;
+        postAction(
+            { action: "set_carryover_enabled", enabled: enabled },
+            { button: el, reloadDelay: 1000 }
+        );
+    },
+    "save-carryover-days": function (el) {
+        const value = parseInt(document.getElementById("carryover-days").value, 10);
+        if (!Number.isInteger(value) || value < 0) {
+            showStatus("Enter 0 or more days", false);
+            return;
+        }
+        postAction(
+            { action: "set_carryover_max_days", days: value },
+            { button: el, reloadDelay: 1000 }
+        );
+    },
 });

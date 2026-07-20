@@ -420,6 +420,12 @@ def action_request_fields(
         return "set", "earn_questions", int(p["questions"]), None
     if action_name == "set_earn_cap":
         return "set", "earn_cap", int(p["minutes"]), None
+    if action_name == "set_carryover_enabled":
+        return "set", "carryover_enabled", bool(p.get("enabled")), None
+    if action_name == "set_carryover_max_days":
+        return "set", "carryover_max_days", int(p["days"]), None
+    if action_name == "reset_today":
+        return "reset_today", None, None, None
     if action_name == "clear_usage_limit":
         return "clear", "daily_limit", None, None
     if action_name == "get_logs":
@@ -659,6 +665,9 @@ def settings_to_pc_info(
         "earn_questions": int(settings.get("earn_questions") or 5),
         "earn_cap": int(settings.get("earn_cap") or 30),
         "earned_today": int(settings.get("earned_today") or 0),
+        "carryover_enabled": bool(settings.get("carryover_enabled")),
+        "carryover_max_days": int(settings.get("carryover_max_days") or 3),
+        "carryover_balance": int(settings.get("carryover_balance") or 0),
         "manual_lock_active": manual_lock_active,
         "enforcement_active": enforcement_active,
         "enforcement_reason": enforcement_reason,

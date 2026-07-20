@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     import tkinter as tk
     from collections.abc import Callable
 
-    from kid_pc_monitor.spelling_quiz import EarnSession
+    from kid_pc_monitor.earn_quiz import EarnSession
 
 # Must match scripts/install.py FIREWALL_RULE_DISPLAY_NAME
 _FIREWALL_RULE_DISPLAY_NAME = "Kid PC Monitor Agent (TCP 9999)"
@@ -209,6 +209,158 @@ def _query_session_locked_via_wts() -> bool | None:
         return None
 
 
+class _QuizDialog:
+    """A centered modal quiz window that steps through questions and awards time.
+
+    Unlike the old per-question popups (which appeared under the corner overlay),
+    this is one window centered on the screen; the result is shown in-place so it
+    is never hidden behind the timer.
+    """
+
+    def __init__(self, root, subject, items, session, award) -> None:
+        import tkinter as tk
+
+        from kid_pc_monitor import earn_quiz
+
+        self._earn_quiz = earn_quiz
+        self._items = items
+        self._award = award
+        self._index = 0
+        self._correct = 0
+        self._done = False
+
+        title = "Earn time — " + ("Maths" if subject == earn_quiz.MATHS else "Spelling")
+        top = tk.Toplevel(root)
+        top.title(title)
+        top.configure(bg="#202020", padx=22, pady=16)
+        top.resizable(False, False)
+        top.attributes("-topmost", True)
+        self._top = top
+
+        header = (
+            f"Answer to earn up to {session.remaining_minutes} min "
+            f"({session.reward_minutes} min per correct answer)."
+        )
+        tk.Label(
+            top,
+            text=header,
+            font=("Segoe UI", 9),
+            fg="#bbbbbb",
+            bg="#202020",
+            wraplength=360,
+            justify="left",
+        ).pack(fill="x")
+
+        self._progress = tk.StringVar()
+        tk.Label(
+            top,
+            textvariable=self._progress,
+            font=("Segoe UI", 9, "bold"),
+            fg="#4caf50",
+            bg="#202020",
+        ).pack(fill="x", pady=(10, 2))
+
+        self._prompt = tk.StringVar()
+        tk.Label(
+            top,
+            textvariable=self._prompt,
+            font=("Segoe UI", 13),
+            fg="#ffffff",
+            bg="#202020",
+            wraplength=360,
+            justify="center",
+        ).pack(fill="x", pady=(6, 10))
+
+        self._entry = tk.Entry(top, font=("Segoe UI", 13), justify="center")
+        self._entry.pack(fill="x")
+        self._entry.bind("<Return>", lambda _e: self._submit())
+
+        self._submit_button = tk.Button(
+            top,
+            text="Submit",
+            font=("Segoe UI", 10, "bold"),
+            bg="#2e7d32",
+            fg="#ffffff",
+            relief="flat",
+            cursor="hand2",
+            command=self._submit,
+        )
+        self._submit_button.pack(fill="x", pady=(12, 0))
+
+        top.protocol("WM_DELETE_WINDOW", self._cancel)
+        self._show_current()
+        self._center()
+        top.grab_set()
+        self._entry.focus_set()
+
+    def _center(self) -> None:
+        top = self._top
+        top.update_idletasks()
+        width, height = top.winfo_width(), top.winfo_height()
+        screen_w, screen_h = top.winfo_screenwidth(), top.winfo_screenheight()
+        x = max(0, (screen_w - width) // 2)
+        y = max(0, (screen_h - height) // 3)
+        top.geometry(f"+{x}+{y}")
+
+    def _show_current(self) -> None:
+        item = self._items[self._index]
+        self._progress.set(f"Question {self._index + 1} of {len(self._items)}")
+        self._prompt.set(item.prompt)
+        self._entry.delete(0, "end")
+
+    def _submit(self) -> None:
+        if self._done:
+            return
+        item = self._items[self._index]
+        if self._earn_quiz.is_correct(item.answer, self._entry.get()):
+            self._correct += 1
+        self._index += 1
+        if self._index >= len(self._items):
+            self._finish()
+        else:
+            self._show_current()
+
+    def _cancel(self) -> None:
+        # Keep whatever they earned so far, then close without a result screen.
+        if not self._done:
+            self._done = True
+            try:
+                self._award(self._correct)
+            except Exception:
+                pass
+        self._close()
+
+    def _finish(self) -> None:
+        self._done = True
+        awarded = 0
+        try:
+            awarded = self._award(self._correct)
+        except Exception as exc:
+            logging.getLogger("PCTimeControl").error("Award failed: %s", exc)
+        if awarded > 0:
+            message = f"Great job!\nYou got {self._correct} right and earned {awarded} minute(s)."
+        else:
+            message = f"You got {self._correct} right.\nNo minutes earned this time."
+        self._progress.set("All done!")
+        self._prompt.set(message)
+        try:
+            self._entry.pack_forget()
+        except Exception:
+            pass
+        self._submit_button.config(text="Close", command=self._close)
+        self._center()
+
+    def _close(self) -> None:
+        try:
+            self._top.grab_release()
+            self._top.destroy()
+        except Exception:
+            pass
+
+    def run(self) -> None:
+        self._top.wait_window()
+
+
 class _TimeOverlay:
     """A small always-on-top window showing the kid's remaining time.
 
@@ -235,7 +387,8 @@ class _TimeOverlay:
         self._root: tk.Tk | None = None
         self._label: tk.Label | None = None
         self._button: tk.Button | None = None
-        self._earn_button: tk.Button | None = None
+        self._earn_spell_button: tk.Button | None = None
+        self._earn_math_button: tk.Button | None = None
         self._move_button: tk.Button | None = None
         self._on_request: Callable[[], None] | None = None
         # Kid-chosen position (persisted locally, independent of parent settings).
@@ -311,9 +464,9 @@ class _TimeOverlay:
                 command=self._handle_request_click,
             )
             button.pack(fill="x", padx=6, pady=(0, 4))
-            earn_button = tk.Button(
+            earn_spell_button = tk.Button(
                 root,
-                text="Earn time (spelling)",
+                text="Earn: Spelling",
                 font=("Segoe UI", 9),
                 relief="flat",
                 bg="#2e7d32",
@@ -321,9 +474,22 @@ class _TimeOverlay:
                 activebackground="#1b5e20",
                 activeforeground="#ffffff",
                 cursor="hand2",
-                command=self._handle_earn_click,
+                command=lambda: self._handle_earn_click("spelling"),
             )
-            earn_button.pack(fill="x", padx=6, pady=(0, 4))
+            earn_spell_button.pack(fill="x", padx=6, pady=(0, 4))
+            earn_math_button = tk.Button(
+                root,
+                text="Earn: Maths",
+                font=("Segoe UI", 9),
+                relief="flat",
+                bg="#1565c0",
+                fg="#ffffff",
+                activebackground="#0d47a1",
+                activeforeground="#ffffff",
+                cursor="hand2",
+                command=lambda: self._handle_earn_click("maths"),
+            )
+            earn_math_button.pack(fill="x", padx=6, pady=(0, 4))
             move_button = tk.Button(
                 root,
                 text="Move ▾",
@@ -340,7 +506,8 @@ class _TimeOverlay:
             self._root = root
             self._label = label
             self._button = button
-            self._earn_button = earn_button
+            self._earn_spell_button = earn_spell_button
+            self._earn_math_button = earn_math_button
             self._move_button = move_button
             self._load_position()
             self._monitors = self._enumerate_monitors(root)
@@ -377,9 +544,9 @@ class _TimeOverlay:
                 pass
 
     def _refresh_earn_button(self) -> None:
-        """Enable the Earn button only when a quiz is currently available."""
-        button = self._earn_button
-        if button is None:
+        """Enable the Earn buttons only when a quiz is currently available."""
+        buttons = [self._earn_spell_button, self._earn_math_button]
+        if not any(buttons):
             return
         available = False
         with self._lock:
@@ -389,12 +556,14 @@ class _TimeOverlay:
                 available = start() is not None
             except Exception:
                 available = False
-        try:
-            button.config(state="normal" if available else "disabled")
-        except Exception:
-            pass
+        for button in buttons:
+            if button is not None:
+                try:
+                    button.config(state="normal" if available else "disabled")
+                except Exception:
+                    pass
 
-    def _handle_earn_click(self) -> None:
+    def _handle_earn_click(self, subject: str) -> None:
         with self._lock:
             start = self._earn_start
             award = self._earn_award
@@ -403,9 +572,8 @@ class _TimeOverlay:
             return
         try:
             import tkinter.messagebox as messagebox
-            import tkinter.simpledialog as simpledialog
 
-            from kid_pc_monitor import spelling_quiz
+            from kid_pc_monitor import earn_quiz
         except Exception as exc:
             logging.getLogger("PCTimeControl").error("Quiz UI unavailable: %s", exc)
             return
@@ -419,40 +587,11 @@ class _TimeOverlay:
 
         from random import Random
 
-        items = spelling_quiz.generate_quiz(session.questions, Random())
-        messagebox.showinfo(
-            "Earn time",
-            f"Spell {len(items)} words to earn up to {session.remaining_minutes} minutes.\n"
-            f"Each correct answer is worth {session.reward_minutes} minute(s).",
-            parent=root,
-        )
-        correct = 0
-        for index, item in enumerate(items, start=1):
-            response = simpledialog.askstring(
-                "Earn time",
-                f"Question {index} of {len(items)}\n\n"
-                "Unscramble these letters to spell a word:\n\n"
-                f"    {item.scrambled}",
-                parent=root,
-            )
-            if response is None:
-                break  # kid cancelled the quiz
-            if spelling_quiz.is_correct(item.answer, response):
-                correct += 1
-
-        awarded = award(correct)
-        if awarded > 0:
-            messagebox.showinfo(
-                "Earn time",
-                f"Great job! You got {correct} right and earned {awarded} minute(s).",
-                parent=root,
-            )
-        else:
-            messagebox.showinfo(
-                "Earn time",
-                f"You got {correct} right. No minutes earned this time.",
-                parent=root,
-            )
+        items = earn_quiz.generate_quiz(subject, session.questions, Random())
+        try:
+            _QuizDialog(root, subject, items, session, award).run()
+        except Exception as exc:
+            logging.getLogger("PCTimeControl").error("Quiz dialog failed: %s", exc, exc_info=True)
 
     def _pos_path(self) -> Path:
         base = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "KidPCMonitor"

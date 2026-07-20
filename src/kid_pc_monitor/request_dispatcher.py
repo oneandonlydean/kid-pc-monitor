@@ -12,6 +12,7 @@ from kid_pc_monitor.agent_protocol import (
     INVALID_VALUE,
     MAX_BREAK_DURATION,
     MAX_BREAK_INTERVAL,
+    MAX_CARRYOVER_DAYS,
     MAX_DAILY_LIMIT,
     MAX_EARN_CAP,
     MAX_EARN_QUESTIONS,
@@ -102,6 +103,12 @@ def _read_variable(control: Any, var: str) -> Any:
         return int(control.daily.earn_daily_cap_minutes)
     if var == "earned_today":
         return int(control.runtime.earned_today_seconds // 60)
+    if var == "carryover_enabled":
+        return bool(control.daily.carryover_enabled)
+    if var == "carryover_max_days":
+        return int(control.daily.carryover_max_days)
+    if var == "carryover_balance":
+        return control.carryover_minutes()
     if var == "wake_time":
         return _format_time(control.daily.wake_time)
     if var == "cumulative_extension":
@@ -218,6 +225,18 @@ def _do_set(control: Any, req: Request) -> list[Node]:
             )
         control.set_earn_cap(minutes)
         result = minutes
+    elif var == "carryover_enabled":
+        enabled = _parse_bool(val, req_id)
+        control.set_carryover_enabled(enabled)
+        result = enabled
+    elif var == "carryover_max_days":
+        days = _parse_int(val, req_id)
+        if not (0 <= days <= MAX_CARRYOVER_DAYS):
+            raise ProtocolError(
+                INVALID_VALUE, f"days must be between 0 and {MAX_CARRYOVER_DAYS}", req_id
+            )
+        control.set_carryover_max_days(days)
+        result = days
     else:  # manual_lock
         engaged = _parse_bool(val, req_id)
         if engaged:
@@ -362,4 +381,8 @@ def dispatch(control: Any, req: Request) -> list[Node]:
         control.clear_manual_lock()
         control.save_state()
         return ok_content("unlocked")
+    if req.action == "reset_today":
+        control.reset_today_balance()
+        control.save_state()
+        return ok_content("today reset")
     raise ProtocolError(UNKNOWN_ACTION, f"unknown action: {req.action}", req.id)

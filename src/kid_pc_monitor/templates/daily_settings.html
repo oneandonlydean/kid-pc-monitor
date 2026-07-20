@@ -105,6 +105,26 @@
                    value="{{ pc_info.get('earn_cap', 30) }}">
             <button class="btn btn-save" data-action="save-earn-cap">Save daily cap</button>
         </div>
+
+        <div class="action-group">
+            <div class="action-title">💰 Carry-over unused time</div>
+            <p class="hint">
+                Roll unused daily allowance into a bank, up to a number of days' worth. The
+                on-screen timer includes any banked minutes automatically.
+                {% if pc_info.get('carryover_balance') %}Banked now: {{ pc_info.carryover_balance }} min.{% endif %}
+            </p>
+            <label class="weekend-toggle">
+                <input type="checkbox" id="carryover-enabled"
+                    {% if pc_info.get('carryover_enabled') %}checked{% endif %}>
+                Roll unused time over to later days
+            </label>
+            <button class="btn btn-save" data-action="save-carryover-enabled">Save carry-over on/off</button>
+
+            <p class="hint">Maximum to bank, in days of the daily allowance.</p>
+            <input type="number" id="carryover-days" min="0" max="30"
+                   value="{{ pc_info.get('carryover_max_days', 3) }}">
+            <button class="btn btn-save" data-action="save-carryover-days">Save carry-over cap</button>
+        </div>
     </div>
 {% endblock %}
 

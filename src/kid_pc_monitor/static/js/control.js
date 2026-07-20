@@ -79,6 +79,15 @@ registerHandlers({
             { button: el, onSuccess: hideRequestBanner }
         );
     },
+    "reset-today": function (el) {
+        if (!confirm("Reset today's used time to zero? (Carry-over is kept.)")) {
+            return;
+        }
+        postAction(
+            { action: "reset_today" },
+            { button: el, refreshStats: true }
+        );
+    },
     "save-breaks": function (el) {
         const interval = parseInt(
             document.getElementById("break-interval").value,

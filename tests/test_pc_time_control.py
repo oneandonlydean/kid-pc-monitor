@@ -477,6 +477,34 @@ class PCTimeControlTests(unittest.TestCase):
             control = self._earn_control(tmp)
             self.assertEqual(control._earn_award(4), 12)  # 4 correct * 3 min
 
+    def test_effective_allowance_includes_carryover_when_enabled(self) -> None:
+        weekday = datetime(2026, 7, 15, 12, 0)
+        with tempfile.TemporaryDirectory() as tmp:
+            control = PCTimeControl(
+                platform=FakeHostPlatform(),
+                data_directory=Path(tmp),
+                start_background_threads=False,
+            )
+            control.daily.allowance = 60
+            control.runtime.carryover_seconds = 30 * 60
+            control.daily.carryover_enabled = True
+            self.assertEqual(control._effective_base_allowance(weekday), 90)
+            control.daily.carryover_enabled = False
+            self.assertEqual(control._effective_base_allowance(weekday), 60)
+
+    def test_reset_today_keeps_carryover(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            control = PCTimeControl(
+                platform=FakeHostPlatform(),
+                data_directory=Path(tmp),
+                start_background_threads=False,
+            )
+            control.runtime.accumulated_seconds = 45 * 60
+            control.runtime.carryover_seconds = 30 * 60
+            control.reset_today_balance()
+            self.assertEqual(control.runtime.accumulated_seconds, 0.0)
+            self.assertEqual(control.runtime.carryover_seconds, 30 * 60)
+
 
 if __name__ == "__main__":
     unittest.main()

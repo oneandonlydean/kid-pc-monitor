@@ -18,6 +18,7 @@ from kid_pc_monitor.agent_state import (
     migrate_legacy_state,
     reset_runtime_for_new_period,
     reset_runtime_if_needed,
+    roll_over_if_needed,
     runtime_state_is_current,
 )
 
@@ -123,6 +124,72 @@ class AgentStateTests(unittest.TestCase):
             store.save(daily, runtime)
             loaded_daily, _ = store.load()
             self.assertIs(loaded_daily.show_timer, False)
+
+    def _stale_runtime(self, *, used_min: int = 0, carry_min: int = 0) -> RuntimeState:
+        return RuntimeState(
+            timestamp=datetime(2026, 7, 18, 12, 0),  # a Saturday, previous period
+            accumulated_seconds=used_min * 60,
+            manual_lock_active=False,
+            cumulative_extension_seconds=0,
+            carryover_seconds=carry_min * 60,
+        )
+
+    _NEXT_DAY = datetime(2026, 7, 19, 12, 0)
+
+    def test_carryover_banks_unused_allowance(self) -> None:
+        daily = DailySettings(
+            bed_time=None,
+            wake_time=dtime(7, 0),
+            allowance=60,
+            carryover_enabled=True,
+            carryover_max_days=3,
+        )
+        runtime = self._stale_runtime(used_min=20)
+        self.assertTrue(roll_over_if_needed(daily, runtime, self._NEXT_DAY))
+        self.assertEqual(runtime.accumulated_seconds, 0.0)  # new day reset
+        self.assertEqual(runtime.carryover_seconds, 40 * 60)  # 60 - 20 unused, banked
+
+    def test_carryover_capped_at_max_days(self) -> None:
+        daily = DailySettings(
+            bed_time=None,
+            wake_time=dtime(7, 0),
+            allowance=60,
+            carryover_enabled=True,
+            carryover_max_days=2,
+        )
+        runtime = self._stale_runtime(used_min=0, carry_min=100)  # 60 + 100 unused
+        roll_over_if_needed(daily, runtime, self._NEXT_DAY)
+        self.assertEqual(runtime.carryover_seconds, 120 * 60)  # capped at 2 * 60
+
+    def test_carryover_disabled_leaves_bank_unchanged(self) -> None:
+        daily = DailySettings(
+            bed_time=None,
+            wake_time=dtime(7, 0),
+            allowance=60,
+            carryover_enabled=False,
+            carryover_max_days=3,
+        )
+        runtime = self._stale_runtime(used_min=10, carry_min=25)
+        roll_over_if_needed(daily, runtime, self._NEXT_DAY)
+        self.assertEqual(runtime.carryover_seconds, 25 * 60)  # frozen when off
+
+    def test_carryover_round_trip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = AgentStateStore(Path(tmp), current_user="kid")
+            daily = DailySettings(
+                bed_time=None,
+                wake_time=dtime(7, 0),
+                allowance=60,
+                carryover_enabled=True,
+                carryover_max_days=5,
+            )
+            runtime = fresh_runtime_state()
+            runtime.carryover_seconds = 1200
+            store.save(daily, runtime)
+            loaded_daily, loaded_runtime = store.load()
+            self.assertTrue(loaded_daily.carryover_enabled)
+            self.assertEqual(loaded_daily.carryover_max_days, 5)
+            self.assertEqual(loaded_runtime.carryover_seconds, 1200)
 
     def test_earn_config_round_trip(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

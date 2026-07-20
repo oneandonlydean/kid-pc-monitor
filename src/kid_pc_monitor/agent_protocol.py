@@ -62,13 +62,16 @@ ACTIONS: dict[str, str] = {
     "shutdown": "shut down the PC after a warning (val=seconds, default 60)",
     "list_capabilities": "describe supported actions and variables",
     "get_logs": "read the agent log file (tail=N lines, default 500, max 5000)",
+    "reset_today": "reset today's used time to zero (keeps carry-over)",
 }
 
 # Write/destructive actions must carry a ``name`` that matches the agent's
 # hostname (see "Cross-PC replay" in docs/agent-protocol.md).  Read-only
 # actions may omit ``name`` so the panel can discover an agent it has never
 # spoken to before.
-WRITE_ACTIONS = frozenset({"set", "clear", "lock", "unlock", "extend", "shutdown", "message"})
+WRITE_ACTIONS = frozenset(
+    {"set", "clear", "lock", "unlock", "extend", "shutdown", "message", "reset_today"}
+)
 
 # Default warning period before shutdown, in seconds.
 DEFAULT_SHUTDOWN_SECONDS = 60
@@ -95,6 +98,9 @@ VARIABLES: dict[str, str] = {
     "earn_questions": "number of questions in an earn-time quiz",
     "earn_cap": "most minutes the kid can earn per day",
     "earned_today": "read-only, minutes already earned via the quiz today",
+    "carryover_enabled": "boolean, whether unused daily allowance rolls over",
+    "carryover_max_days": "cap on carry-over, in days of the daily allowance",
+    "carryover_balance": "read-only, minutes currently banked from carry-over",
     "cumulative_extension": "read-only, a running total of extension seconds today",
     "accumulated_seconds": "read-only, a running total of active seconds used today",
     "time_remaining": "read-only, minutes remaining today (or null)",
@@ -119,6 +125,8 @@ WRITABLE_VARIABLES = frozenset(
         "earn_reward",
         "earn_questions",
         "earn_cap",
+        "carryover_enabled",
+        "carryover_max_days",
     }
 )
 CLEARABLE_VARIABLES = frozenset(
@@ -142,6 +150,9 @@ MAX_BREAK_DURATION = 120
 MAX_EARN_REWARD = 120
 MAX_EARN_QUESTIONS = 20
 MAX_EARN_CAP = 600
+
+# Carry-over cap, in days of the daily allowance.
+MAX_CARRYOVER_DAYS = 30
 
 # A daily limit outside this range is almost certainly a mistake.
 MIN_DAILY_LIMIT = 1

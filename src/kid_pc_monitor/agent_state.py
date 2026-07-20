@@ -38,6 +38,9 @@ class DailySettings:
     earn_reward_minutes: int = 5  # minutes granted per correct answer
     earn_questions: int = 5  # questions per quiz session
     earn_daily_cap_minutes: int = 30  # most minutes earnable per day
+    # Carry-over: unused daily allowance rolls into a bank, capped at N days' worth.
+    carryover_enabled: bool = False
+    carryover_max_days: int = 3
 
 
 @dataclass
@@ -54,6 +57,8 @@ class RuntimeState:
     break_baseline_seconds: float = 0.0
     # Minutes-worth of time earned via the spelling quiz today (for the daily cap).
     earned_today_seconds: int = 0
+    # Banked unused allowance carried over from previous days (persists across days).
+    carryover_seconds: int = 0
 
 
 def _format_time(value: dtime) -> str:
@@ -117,6 +122,44 @@ def reset_runtime_if_needed(
     return True
 
 
+def compute_carryover_seconds(daily: DailySettings, runtime: RuntimeState, now: datetime) -> int:
+    """The new carry-over bank when the usage period ending at ``now`` rolls over.
+
+    Unused allowance (the base plus the existing bank, minus what was used) rolls
+    into the bank, capped at ``carryover_max_days`` days of the base allowance.
+    Fully-idle days (agent off across a day boundary) each credit a base
+    allowance. Extensions are one-day grants and never bank. When carry-over is
+    off, or there is no daily cap, the bank is left unchanged.
+    """
+    if not daily.carryover_enabled or daily.allowance is None:
+        return runtime.carryover_seconds
+    base = daily.allowance
+    carry_minutes = runtime.carryover_seconds / 60
+    used_minutes = runtime.accumulated_seconds / 60
+    leftover = max(0.0, (base + carry_minutes) - used_minutes)
+    previous = usage_period_date(runtime.timestamp, daily.wake_time)
+    current = usage_period_date(now, daily.wake_time)
+    idle_days = max(0, (current - previous).days - 1)
+    leftover += idle_days * base
+    cap_minutes = daily.carryover_max_days * base
+    return int(min(leftover, cap_minutes) * 60)
+
+
+def roll_over_if_needed(
+    daily: DailySettings,
+    runtime: RuntimeState,
+    now: datetime | None = None,
+) -> bool:
+    """Bank carry-over and reset the runtime when a new usage period has started."""
+    now = now or datetime.now()
+    if runtime_state_is_current(runtime, daily.wake_time, now):
+        return False
+    new_carryover = compute_carryover_seconds(daily, runtime, now)
+    reset_runtime_for_new_period(runtime, now)
+    runtime.carryover_seconds = new_carryover
+    return True
+
+
 def daily_to_dict(daily: DailySettings) -> dict:
     payload: dict = {
         "wake_time": _format_time(daily.wake_time),
@@ -133,6 +176,8 @@ def daily_to_dict(daily: DailySettings) -> dict:
         "earn_reward_minutes": daily.earn_reward_minutes,
         "earn_questions": daily.earn_questions,
         "earn_daily_cap_minutes": daily.earn_daily_cap_minutes,
+        "carryover_enabled": daily.carryover_enabled,
+        "carryover_max_days": daily.carryover_max_days,
     }
     if daily.bed_time is not None:
         payload["bed_time"] = _format_time(daily.bed_time)
@@ -159,6 +204,7 @@ def runtime_to_dict(runtime: RuntimeState) -> dict:
         ),
         "break_baseline_seconds": round(runtime.break_baseline_seconds, 3),
         "earned_today_seconds": int(runtime.earned_today_seconds),
+        "carryover_seconds": int(runtime.carryover_seconds),
     }
 
 
@@ -200,6 +246,8 @@ def load_daily_from_dict(data: dict) -> DailySettings:
         earn_reward_minutes=int(data.get("earn_reward_minutes", 5) or 5),
         earn_questions=int(data.get("earn_questions", 5) or 5),
         earn_daily_cap_minutes=int(data.get("earn_daily_cap_minutes", 30) or 30),
+        carryover_enabled=bool(data.get("carryover_enabled", False)),
+        carryover_max_days=int(data.get("carryover_max_days", 3) or 3),
     )
 
 
@@ -260,6 +308,7 @@ def load_runtime_from_dict(data: dict) -> RuntimeState:
         break_active_until=break_active_until,
         break_baseline_seconds=float(data.get("break_baseline_seconds", 0.0)),
         earned_today_seconds=int(data.get("earned_today_seconds", 0) or 0),
+        carryover_seconds=int(data.get("carryover_seconds", 0) or 0),
     )
 
 
@@ -422,8 +471,8 @@ class AgentStateStore:
     def load(self) -> tuple[DailySettings, RuntimeState]:
         daily = self._load_daily()
         runtime = self._load_runtime(daily.wake_time)
-        if reset_runtime_if_needed(runtime, daily.wake_time):
-            logger.info("Runtime state is from a previous usage period; resetting daily counters")
+        if roll_over_if_needed(daily, runtime):
+            logger.info("Runtime state is from a previous usage period; rolled the day over")
         return daily, runtime
 
     def save(self, daily: DailySettings, runtime: RuntimeState) -> None:

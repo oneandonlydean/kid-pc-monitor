@@ -24,7 +24,9 @@ DIY parental control system for tech-savvy parents. If you know what 'pip instal
 - **🙋 Request more time** - Kids ask for more time from their screen; you approve or dismiss from your phone
 - **🎁 One-tap bonus time** - Grant +15/+30 minutes straight from the dashboard, no drilling in
 - **🎉 Weekday / weekend schedules** - Optionally use a later bedtime and bigger allowance on Saturday and Sunday
-- **🧠 Earn time by spelling** - Kids unscramble words to earn extra minutes, up to a daily cap you set
+- **🧠 Earn time by quiz** - Kids answer spelling or maths questions to earn extra minutes, up to a daily cap you set
+- **💰 Carry-over** - Optionally roll unused daily allowance into a bank, up to N days' worth; the timer includes it automatically
+- **♻️ Reset today** - One click to give back today's used time without touching the carry-over bank
 - **📈 Usage history chart** - A per-day usage bar chart for each PC
 
 Note: this is a fork of [cpmurphy's fork](https://github.com/cpmurphy/kid-pc-monitor)
@@ -419,14 +421,23 @@ turn on a separate **bedtime and allowance for Saturday and Sunday**. When it's
 on, those values apply on Sat/Sun and the weekday settings apply the rest of the
 week. (Weekend is Saturday and Sunday based on the wake-to-wake day.)
 
-### Earn time by spelling (this fork)
+### Earn time by quiz (this fork)
 
 On a PC's **Daily settings** page, the **🧠 Earn time** section lets your child
-earn extra minutes by unscrambling words. You configure whether it's on, the
+earn extra minutes by answering questions. You configure whether it's on, the
 **minutes earned per correct answer**, the **number of questions** per quiz, and
-a **daily cap** on how much can be earned. The child taps **Earn time
-(spelling)** on the on-screen timer to play; correct answers grant time up to the
-cap.
+a **daily cap** on how much can be earned. The on-screen timer shows two buttons,
+**Earn: Spelling** (unscramble words) and **Earn: Maths** (arithmetic); the quiz
+opens in a window centered on the screen, and correct answers grant time up to
+the cap.
+
+### Carry-over unused time (this fork)
+
+On the **Daily settings** page, turn on **💰 Carry-over** to roll a day's unused
+allowance into a bank, capped at a number of days' worth of the daily allowance.
+Banked minutes are added to the daily allowance automatically, so the on-screen
+timer already reflects them. On a PC's control page, **Reset today's usage** sets
+today's used time back to zero **without** spending the carry-over bank.
 
 ### Usage history chart (this fork)
 
@@ -514,7 +525,8 @@ Parents and developers welcome! Please:
 - ✅ **Request more time** — Kids ask from their screen; parents approve (grant extension) or dismiss from the panel
 - ✅ **One-tap bonus time** — +15/+30 minute buttons on the dashboard PC cards
 - ✅ **Weekday / weekend schedules** — Optional separate bedtime and allowance for Saturday and Sunday
-- ✅ **Earn time by spelling** — Kids unscramble words to earn extra minutes, up to a parent-set daily cap
+- ✅ **Earn time by quiz** — Kids answer spelling or maths questions (in a centered dialog) to earn extra minutes, up to a parent-set daily cap
+- ✅ **Carry-over** — Unused daily allowance banks up to N days' worth; **Reset today** clears today's usage without spending the bank
 - ✅ **Usage history chart** — Per-day usage bar chart on the usage-history page
 - ✅ **Mutual authentication** — HMAC-signed agent protocol (v3); shared secret stored encrypted at rest
 - ✅ **Web panel security** — Optional password login; CSRF protection on state-changing actions

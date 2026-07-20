@@ -156,6 +156,24 @@ class DispatchTests(unittest.TestCase):
             self.assertIsNone(control.daily.weekend_allowance)
             self.assertIsNone(control.daily.weekend_bed_time)
 
+    def test_carryover_config_and_reset_today(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            control = self._control(tmp, hostname="kid-pc")
+            self.assertIs(self._dispatch_ok(control, action="get", var="carryover_enabled"), False)
+            self.assertIs(
+                self._dispatch_ok(control, action="set", var="carryover_enabled", val=True), True
+            )
+            self.assertEqual(
+                self._dispatch_ok(control, action="set", var="carryover_max_days", val=5), 5
+            )
+            self.assertEqual(self._dispatch_ok(control, action="get", var="carryover_balance"), 0)
+            # reset_today zeroes usage but keeps the carry-over bank.
+            control.runtime.accumulated_seconds = 30 * 60
+            control.runtime.carryover_seconds = 15 * 60
+            self.assertEqual(self._dispatch_ok(control, action="reset_today"), "today reset")
+            self.assertEqual(control.runtime.accumulated_seconds, 0.0)
+            self.assertEqual(control.runtime.carryover_seconds, 15 * 60)
+
     def test_earn_config_get_and_set(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             control = self._control(tmp, hostname="kid-pc")
