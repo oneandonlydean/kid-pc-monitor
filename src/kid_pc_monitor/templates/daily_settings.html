@@ -148,6 +148,14 @@
             <input type="number" id="carryover-days" min="0" max="30"
                    value="{{ pc_info.get('carryover_max_days', 3) }}">
             <button class="btn btn-save" data-action="save-carryover-days">Save carry-over cap</button>
+
+            <p class="hint">
+                Banked balance (minutes). Set this directly to add or correct the bank —
+                e.g. reward a good week, or clear it back to 0.
+            </p>
+            <input type="number" id="carryover-balance" min="0" max="43200"
+                   value="{{ pc_info.get('carryover_balance', 0) }}">
+            <button class="btn btn-save" data-action="save-carryover-balance">Save banked balance</button>
         </div>
     </div>
 {% endblock %}

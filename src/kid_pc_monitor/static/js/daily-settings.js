@@ -166,4 +166,15 @@ registerHandlers({
             { button: el, reloadDelay: 1000 }
         );
     },
+    "save-carryover-balance": function (el) {
+        const value = parseInt(document.getElementById("carryover-balance").value, 10);
+        if (!Number.isInteger(value) || value < 0) {
+            showStatus("Enter 0 or more minutes for the banked balance", false);
+            return;
+        }
+        postAction(
+            { action: "set_carryover_balance", minutes: value },
+            { button: el, reloadDelay: 1000 }
+        );
+    },
 });

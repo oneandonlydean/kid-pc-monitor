@@ -536,6 +536,19 @@ class PCTimeControlTests(unittest.TestCase):
             self.assertEqual(control.runtime.carryover_seconds, 15 * 60)
             self.assertEqual(control.carryover_minutes(), 15)
 
+    def test_set_carryover_balance_sets_and_clamps(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            control = PCTimeControl(
+                platform=FakeHostPlatform(),
+                data_directory=Path(tmp),
+                start_background_threads=False,
+            )
+            control.set_carryover_balance(90)
+            self.assertEqual(control.runtime.carryover_seconds, 90 * 60)
+            self.assertEqual(control.carryover_minutes(), 90)
+            control.set_carryover_balance(-10)  # negatives clamp to zero
+            self.assertEqual(control.runtime.carryover_seconds, 0)
+
     def test_reset_today_keeps_carryover(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             control = PCTimeControl(

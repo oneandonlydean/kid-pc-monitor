@@ -27,6 +27,10 @@ STATUS_REFRESH_SEC = 5.0
 EXCHANGE_TIMEOUT_SEC = 30.0
 ACCEPT_TIMEOUT_SEC = 1.0
 
+# Protocol verbs that only read state; everything else mutates the agent and
+# should trigger an immediate settings refresh of the cached session.pc_info.
+_READ_ONLY_ACTIONS = frozenset({"get", "get_logs"})
+
 StatusCallback = Callable[[str, str, dict[str, Any]], object]
 DisconnectCallback = Callable[[str, str], object]
 
@@ -172,6 +176,13 @@ class PanelReverseServer:
         try:
             action, var, val, tail = action_request_fields(action_name, payload)
             response = session.submit(action=action, var=var, val=val, tail=tail)
+            if response.ok and action not in _READ_ONLY_ACTIONS:
+                # A mutating action just changed agent state. Refresh the cached
+                # settings now so a page reload right after the save (the panel
+                # reloads ~1s later) reflects the change, instead of showing the
+                # stale value until the next periodic refresh and looking like the
+                # save was ignored (e.g. a checkbox appearing to untick itself).
+                self._refresh_session_settings(session)
             return response.ok, response.text
         except (ValueError, KeyError, TypeError) as exc:
             return False, f"Invalid value for {action_name}: {exc}"
@@ -342,6 +353,24 @@ class PanelReverseServer:
                 if not future.cancelled():
                     future.set_exception(exc)
                 return
+
+    def _refresh_session_settings(self, session: ReverseSession) -> None:
+        """Re-read settings into ``session.pc_info`` via the session's request
+        queue (only the session loop thread may use the socket directly).
+
+        Best-effort: a failed refresh must never change the action's result, so
+        the caller's (ok, text) is returned regardless of what happens here.
+        """
+        try:
+            response = session.submit(action="get", var="settings")
+        except Exception:  # noqa: BLE001 - cache refresh is best-effort
+            logger.debug(
+                "Post-action settings refresh failed for %s", session.hostname, exc_info=True
+            )
+            return
+        if response.ok and response.settings is not None:
+            session.pc_info = dict(response.settings)
+            self._emit_status(session, response.settings)
 
     def _refresh_status(self, session: ReverseSession, secret: str) -> None:
         response = exchange_on_socket(

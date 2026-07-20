@@ -427,6 +427,11 @@ class PCTimeControl:
         """Minutes currently banked from unused allowance."""
         return int(self.runtime.carryover_seconds // 60)
 
+    def set_carryover_balance(self, minutes: int) -> None:
+        """Directly set the banked carry-over balance (parent override)."""
+        self.runtime.carryover_seconds = max(0, minutes) * 60
+        self.logger.info("Parent action: carry-over balance set to %d min", max(0, minutes))
+
     def set_weekend_enabled(self, enabled: bool) -> None:
         """Turn the separate Saturday/Sunday schedule on or off."""
         self.daily.weekend_enabled = enabled

@@ -428,6 +428,8 @@ def action_request_fields(
         return "set", "carryover_enabled", bool(p.get("enabled")), None
     if action_name == "set_carryover_max_days":
         return "set", "carryover_max_days", int(p["days"]), None
+    if action_name == "set_carryover_balance":
+        return "set", "carryover_balance", int(p["minutes"]), None
     if action_name == "reset_today":
         return "reset_today", None, None, None
     if action_name == "clear_usage_limit":

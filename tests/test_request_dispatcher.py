@@ -167,6 +167,14 @@ class DispatchTests(unittest.TestCase):
                 self._dispatch_ok(control, action="set", var="carryover_max_days", val=5), 5
             )
             self.assertEqual(self._dispatch_ok(control, action="get", var="carryover_balance"), 0)
+            # The banked balance can be set directly by the parent.
+            self.assertEqual(
+                self._dispatch_ok(control, action="set", var="carryover_balance", val=45), 45
+            )
+            self.assertEqual(control.runtime.carryover_seconds, 45 * 60)
+            self.assertEqual(self._dispatch_ok(control, action="get", var="carryover_balance"), 45)
+            with self.assertRaises(ProtocolError):
+                self._dispatch_ok(control, action="set", var="carryover_balance", val=-5)
             # reset_today zeroes usage but keeps the carry-over bank.
             control.runtime.accumulated_seconds = 30 * 60
             control.runtime.carryover_seconds = 15 * 60

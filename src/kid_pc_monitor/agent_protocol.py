@@ -102,7 +102,7 @@ VARIABLES: dict[str, str] = {
     "earned_today": "read-only, minutes already earned via the quiz today",
     "carryover_enabled": "boolean, whether unused daily allowance rolls over",
     "carryover_max_days": "cap on carry-over, in days of the daily allowance",
-    "carryover_balance": "read-only, minutes currently banked from carry-over",
+    "carryover_balance": "minutes currently banked from carry-over (settable to override)",
     "cumulative_extension": "read-only, a running total of extension seconds today",
     "accumulated_seconds": "read-only, a running total of active seconds used today",
     "time_remaining": "read-only, minutes remaining today (or null)",
@@ -131,6 +131,7 @@ WRITABLE_VARIABLES = frozenset(
         "earn_maths_difficulty",
         "carryover_enabled",
         "carryover_max_days",
+        "carryover_balance",
     }
 )
 CLEARABLE_VARIABLES = frozenset(
@@ -160,6 +161,10 @@ EARN_DIFFICULTIES = ("easy", "medium", "hard")
 
 # Carry-over cap, in days of the daily allowance.
 MAX_CARRYOVER_DAYS = 30
+
+# Absolute ceiling for a manually set carry-over balance (30 days x 24h), a
+# sanity bound well above any realistic bank.
+MAX_CARRYOVER_BALANCE = 43200
 
 # A daily limit outside this range is almost certainly a mistake.
 MIN_DAILY_LIMIT = 1

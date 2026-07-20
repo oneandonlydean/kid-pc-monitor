@@ -451,9 +451,11 @@ allowance into a bank, capped at a number of days' worth of the daily allowance.
 Unused quiz-earned minutes bank the same way, so time earned close to bedtime
 carries to the next day instead of evaporating; parent time extensions remain
 one-day grants and never bank. Banked minutes are added to the daily allowance
-automatically, so the on-screen timer already reflects them. On a PC's control
-page, **Reset today's usage** sets today's used time back to zero **without**
-spending the carry-over bank.
+automatically, so the on-screen timer already reflects them. You can also set the
+**banked balance** directly on the Daily settings page — handy to reward a good
+week or to clear the bank back to zero. On a PC's control page, **Reset today's
+usage** sets today's used time back to zero **without** spending the carry-over
+bank.
 
 ### On-screen timer detail (this fork)
 

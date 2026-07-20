@@ -13,6 +13,7 @@ from kid_pc_monitor.agent_protocol import (
     INVALID_VALUE,
     MAX_BREAK_DURATION,
     MAX_BREAK_INTERVAL,
+    MAX_CARRYOVER_BALANCE,
     MAX_CARRYOVER_DAYS,
     MAX_DAILY_LIMIT,
     MAX_EARN_CAP,
@@ -259,6 +260,14 @@ def _do_set(control: Any, req: Request) -> list[Node]:
             )
         control.set_carryover_max_days(days)
         result = days
+    elif var == "carryover_balance":
+        minutes = _parse_int(val, req_id)
+        if not (0 <= minutes <= MAX_CARRYOVER_BALANCE):
+            raise ProtocolError(
+                INVALID_VALUE, f"minutes must be between 0 and {MAX_CARRYOVER_BALANCE}", req_id
+            )
+        control.set_carryover_balance(minutes)
+        result = minutes
     else:  # manual_lock
         engaged = _parse_bool(val, req_id)
         if engaged:
