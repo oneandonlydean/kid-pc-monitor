@@ -19,10 +19,19 @@ DIY parental control system for tech-savvy parents. If you know what 'pip instal
 - **💾 Persistent settings** - Limits survive PC restarts
 - **👤 User-specific restrictions** - Monitor only specific Windows accounts
 - **📊 Real-time status** - See current limits and time remaining
+- **⏳ On-screen countdown** - Kids always see the time left today; it turns red in the final minutes (can be hidden per PC)
+- **🧍 Break reminders** - Force a stretch break for a few minutes after a set amount of continuous use
+- **🙋 Request more time** - Kids ask for more time from their screen; you approve or dismiss from your phone
+- **🎁 One-tap bonus time** - Grant +15/+30 minutes straight from the dashboard, no drilling in
+- **🎉 Weekday / weekend schedules** - Optionally use a later bedtime and bigger allowance on Saturday and Sunday
+- **🧠 Earn time by spelling** - Kids unscramble words to earn extra minutes, up to a daily cap you set
+- **📈 Usage history chart** - A per-day usage bar chart for each PC
 
-Note: this is a fork from rookie7799's implementation.  I'd like to thank
-them for all the work providing the starting point.  As it is a fork, they have no
-responsibility for any problems with this version.
+Note: this is a fork of [cpmurphy's fork](https://github.com/cpmurphy/kid-pc-monitor)
+(itself a fork of [rookie7799's original](https://github.com/rookie7799/kid-pc-monitor)),
+with the extra features listed above the fold. Huge thanks to both for the
+groundwork. As a fork, neither of them is responsible for any problems with this
+version.
 
 
 ## ⚠️ Technical Skills Required
@@ -82,7 +91,7 @@ Log in  as an Admin user and open PowerShell.
 
 Run:
 ```powershell
-git clone https://github.com/cpmurphy/kid-pc-monitor.git
+git clone https://github.com/oneandonlydean/kid-pc-monitor.git
 cd kid-pc-monitor
 pip install -r requirements.txt
 python scripts\install.py
@@ -104,7 +113,7 @@ For this setup, you want to:
  2. Open PowerShell
 
 ```powershell
-git clone https://github.com/cpmurphy/kid-pc-monitor.git
+git clone https://github.com/oneandonlydean/kid-pc-monitor.git
 cd kid-pc-monitor
 pip install -r requirements.txt
 pip install -e .
@@ -212,7 +221,7 @@ a computer you control.
 Only Windows is supported currently.
 
 ```powershell
-git clone https://github.com/cpmurphy/kid-pc-monitor.git
+git clone https://github.com/oneandonlydean/kid-pc-monitor.git
 cd kid-pc-monitor
 pip install -r requirements.txt
 
@@ -255,7 +264,7 @@ Run the web panel on a separate PC (your own computer). More secure since kids c
 (For MacOS/Linux, see below.)
 
 ```powershell
-git clone https://github.com/cpmurphy/kid-pc-monitor.git
+git clone https://github.com/oneandonlydean/kid-pc-monitor.git
 cd kid-pc-monitor
 pip install -r requirements.txt
 pip install -e .
@@ -303,7 +312,7 @@ phone. Convenient if you don't have a separate PC always running.
 
 1. **On the kid's PC (as administrator):**
 ```powershell
-git clone https://github.com/cpmurphy/kid-pc-monitor.git
+git clone https://github.com/oneandonlydean/kid-pc-monitor.git
 cd kid-pc-monitor
 pip install -r requirements.txt
 
@@ -353,6 +362,56 @@ re-issues the lock whenever it detects the screen has been unlocked, so
 the child can't bypass it by typing their Windows password. The **Lock
 Computer Now** button enables a manual lock that remains active until
 you clear all limits.
+
+### On-screen timer (this fork)
+
+By default the kid's PC shows a small always-on-top countdown of the time left
+today. It turns **red in the final few minutes** before a lock. On a PC's
+control page, use **⏳ On-Screen Timer → Show/Hide** to turn it off or on per
+PC.
+
+### Break reminders (this fork)
+
+On a PC's control page, the **🧍 Break reminders** section lets you lock the
+screen for a short stretch break after a set amount of *active* use — for
+example, every **45** minutes of use, lock for **5** minutes. The break shows a
+"stand up and stretch" message, does **not** count against the daily allowance,
+and releases automatically. Set the interval to **0** to turn breaks off.
+
+### Kids asking for more time (this fork)
+
+When the on-screen timer is visible, the kid can click **Ask for more time**.
+Their request appears as a banner on that PC's control page, where you can
+**grant an extension to approve** it or **dismiss** it. Granting any extension
+clears the request.
+
+### One-tap bonus time (this fork)
+
+Each reachable PC on the dashboard has **🎁 Bonus time: +15 / +30** buttons that
+grant an extension immediately — handy for rewarding chores without opening the
+PC's page.
+
+### Weekday / weekend schedules (this fork)
+
+On a PC's **Daily settings** page, the **🎉 Weekend schedule** section lets you
+turn on a separate **bedtime and allowance for Saturday and Sunday**. When it's
+on, those values apply on Sat/Sun and the weekday settings apply the rest of the
+week. (Weekend is Saturday and Sunday based on the wake-to-wake day.)
+
+### Earn time by spelling (this fork)
+
+On a PC's **Daily settings** page, the **🧠 Earn time** section lets your child
+earn extra minutes by unscrambling words. You configure whether it's on, the
+**minutes earned per correct answer**, the **number of questions** per quiz, and
+a **daily cap** on how much can be earned. The child taps **Earn time
+(spelling)** on the on-screen timer to play; correct answers grant time up to the
+cap.
+
+### Usage history chart (this fork)
+
+The usage-history page (linked from a PC's page) shows a **per-day bar chart** of
+screen time for the last week, with the daily allowance marked and over-limit
+days highlighted, above the existing table.
 
 ## ⚙️ Configuration
 
@@ -429,6 +488,13 @@ Parents and developers welcome! Please:
 3. Submit a pull request
 
 ### Recent Improvements
+- ✅ **On-screen countdown timer** — Always-visible time-left overlay that turns red in the final minutes; hideable per PC
+- ✅ **Break reminders** — Configurable forced stretch breaks after a set amount of continuous use
+- ✅ **Request more time** — Kids ask from their screen; parents approve (grant extension) or dismiss from the panel
+- ✅ **One-tap bonus time** — +15/+30 minute buttons on the dashboard PC cards
+- ✅ **Weekday / weekend schedules** — Optional separate bedtime and allowance for Saturday and Sunday
+- ✅ **Earn time by spelling** — Kids unscramble words to earn extra minutes, up to a parent-set daily cap
+- ✅ **Usage history chart** — Per-day usage bar chart on the usage-history page
 - ✅ **Mutual authentication** — HMAC-signed agent protocol (v3); shared secret stored encrypted at rest
 - ✅ **Web panel security** — Optional password login; CSRF protection on state-changing actions
 - ✅ **Linux/macOS parent support** — Run the web panel on non-Windows machines; systemd user-service installer
@@ -461,4 +527,4 @@ Created by parents, for parents. Special thanks to all contributors who help mak
 
 ---
 
-**Need Help?** Open an [issue](https://github.com/cpmurphy/kid-pc-monitor/issues) or check our [FAQ](docs/FAQ.md)
+**Need Help?** Open an [issue](https://github.com/oneandonlydean/kid-pc-monitor/issues) or check our [FAQ](docs/FAQ.md)
