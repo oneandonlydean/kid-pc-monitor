@@ -90,6 +90,21 @@ def is_in_bedtime_curfew(
     return bed_m <= now_m < wake_m
 
 
+def minutes_until_bedtime(now: datetime, bed_time: dtime | None) -> float | None:
+    """Minutes from now until the next occurrence of bed_time (None if unset)."""
+    if bed_time is None:
+        return None
+    bed_datetime = now.replace(
+        hour=bed_time.hour,
+        minute=bed_time.minute,
+        second=0,
+        microsecond=0,
+    )
+    if bed_datetime <= now:
+        bed_datetime = bed_datetime + timedelta(days=1)
+    return (bed_datetime - now).total_seconds() / 60
+
+
 def lock_decision(
     *,
     now: datetime,
@@ -167,18 +182,7 @@ def minutes_until_lock(
     min_remaining = None
 
     if bed_time is not None:
-        bed_datetime = now.replace(
-            hour=bed_time.hour,
-            minute=bed_time.minute,
-            second=0,
-            microsecond=0,
-        )
-
-        if bed_datetime <= now:
-            bed_datetime = bed_datetime + timedelta(days=1)
-
-        minutes_remaining = (bed_datetime - now).total_seconds() / 60
-        min_remaining = minutes_remaining
+        min_remaining = minutes_until_bedtime(now, bed_time)
 
     if effective_usage_allowance_minutes is not None:
         minutes_remaining = effective_usage_allowance_minutes - accumulated_minutes

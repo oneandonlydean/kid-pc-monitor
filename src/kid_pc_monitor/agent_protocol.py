@@ -93,10 +93,12 @@ VARIABLES: dict[str, str] = {
     "weekend_enabled": "boolean, whether the separate Sat/Sun schedule is active",
     "weekend_bed_time": "bedtime used on Sat/Sun when the weekend schedule is on",
     "weekend_allowance": "daily limit (minutes) used on Sat/Sun when the weekend schedule is on",
-    "earn_enabled": "boolean, whether the kid can earn time with the spelling quiz",
-    "earn_reward": "minutes earned per correct spelling answer",
+    "earn_enabled": "boolean, whether the kid can earn time with the quiz",
+    "earn_reward": "minutes earned per correct answer",
     "earn_questions": "number of questions in an earn-time quiz",
     "earn_cap": "most minutes the kid can earn per day",
+    "earn_spelling_difficulty": "spelling quiz difficulty (easy | medium | hard)",
+    "earn_maths_difficulty": "maths quiz difficulty (easy | medium | hard)",
     "earned_today": "read-only, minutes already earned via the quiz today",
     "carryover_enabled": "boolean, whether unused daily allowance rolls over",
     "carryover_max_days": "cap on carry-over, in days of the daily allowance",
@@ -125,6 +127,8 @@ WRITABLE_VARIABLES = frozenset(
         "earn_reward",
         "earn_questions",
         "earn_cap",
+        "earn_spelling_difficulty",
+        "earn_maths_difficulty",
         "carryover_enabled",
         "carryover_max_days",
     }
@@ -146,10 +150,13 @@ CLEARABLE_VARIABLES = frozenset(
 MAX_BREAK_INTERVAL = 600
 MAX_BREAK_DURATION = 120
 
-# Sensible bounds for the earn-time spelling quiz.
+# Sensible bounds for the earn-time quiz.
 MAX_EARN_REWARD = 120
 MAX_EARN_QUESTIONS = 20
 MAX_EARN_CAP = 600
+
+# Accepted difficulty levels for the earn-time quizzes.
+EARN_DIFFICULTIES = ("easy", "medium", "hard")
 
 # Carry-over cap, in days of the daily allowance.
 MAX_CARRYOVER_DAYS = 30

@@ -78,10 +78,10 @@
         </div>
 
         <div class="action-group">
-            <div class="action-title">🧠 Earn time (spelling quiz)</div>
+            <div class="action-title">🧠 Earn time (spelling &amp; maths quiz)</div>
             <p class="hint">
-                Let the kid earn extra minutes by unscrambling words on their PC, up to a daily cap.
-                Earned today: {{ pc_info.get('earned_today', 0) }} min.
+                Let the kid earn extra minutes by answering spelling and maths questions on their
+                PC, up to a daily cap. Earned today: {{ pc_info.get('earned_today', 0) }} min.
             </p>
             <label class="weekend-toggle">
                 <input type="checkbox" id="earn-enabled"
@@ -104,6 +104,30 @@
             <input type="number" id="earn-cap" min="0" max="600"
                    value="{{ pc_info.get('earn_cap', 30) }}">
             <button class="btn btn-save" data-action="save-earn-cap">Save daily cap</button>
+
+            <p class="hint">
+                Spelling difficulty. Easy fills in one missing letter of a short word, Medium
+                several letters of a longer word, Hard is a full word to unscramble.
+            </p>
+            {% set spelling_level = pc_info.get('earn_spelling_difficulty', 'medium') %}
+            <select id="earn-spelling-difficulty">
+                <option value="easy" {% if spelling_level == 'easy' %}selected{% endif %}>Easy</option>
+                <option value="medium" {% if spelling_level == 'medium' %}selected{% endif %}>Medium</option>
+                <option value="hard" {% if spelling_level == 'hard' %}selected{% endif %}>Hard</option>
+            </select>
+            <button class="btn btn-save" data-action="save-earn-spelling-difficulty">Save spelling difficulty</button>
+
+            <p class="hint">
+                Maths difficulty. Easy is small add/subtract, Medium adds times-tables and
+                division, Hard uses bigger numbers across all four operations.
+            </p>
+            {% set maths_level = pc_info.get('earn_maths_difficulty', 'medium') %}
+            <select id="earn-maths-difficulty">
+                <option value="easy" {% if maths_level == 'easy' %}selected{% endif %}>Easy</option>
+                <option value="medium" {% if maths_level == 'medium' %}selected{% endif %}>Medium</option>
+                <option value="hard" {% if maths_level == 'hard' %}selected{% endif %}>Hard</option>
+            </select>
+            <button class="btn btn-save" data-action="save-earn-maths-difficulty">Save maths difficulty</button>
         </div>
 
         <div class="action-group">

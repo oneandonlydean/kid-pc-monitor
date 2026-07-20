@@ -193,6 +193,30 @@ class DispatchTests(unittest.TestCase):
             self.assertEqual(control.daily.earn_daily_cap_minutes, 45)
             self.assertEqual(self._dispatch_ok(control, action="get", var="earned_today"), 0)
 
+    def test_earn_difficulty_get_set_and_validation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            control = self._control(tmp, hostname="kid-pc")
+            # Defaults are medium.
+            self.assertEqual(
+                self._dispatch_ok(control, action="get", var="earn_spelling_difficulty"), "medium"
+            )
+            self.assertEqual(
+                self._dispatch_ok(
+                    control, action="set", var="earn_spelling_difficulty", val="easy"
+                ),
+                "easy",
+            )
+            self.assertEqual(
+                self._dispatch_ok(control, action="set", var="earn_maths_difficulty", val="hard"),
+                "hard",
+            )
+            self.assertEqual(control.daily.earn_spelling_difficulty, "easy")
+            self.assertEqual(control.daily.earn_maths_difficulty, "hard")
+            with self.assertRaises(ProtocolError):
+                self._dispatch_ok(
+                    control, action="set", var="earn_spelling_difficulty", val="impossible"
+                )
+
     def test_break_interval_rejects_out_of_range(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             control = self._control(tmp, hostname="kid-pc")

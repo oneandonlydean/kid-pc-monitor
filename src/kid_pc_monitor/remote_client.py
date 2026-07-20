@@ -420,6 +420,10 @@ def action_request_fields(
         return "set", "earn_questions", int(p["questions"]), None
     if action_name == "set_earn_cap":
         return "set", "earn_cap", int(p["minutes"]), None
+    if action_name == "set_earn_spelling_difficulty":
+        return "set", "earn_spelling_difficulty", str(p["level"]), None
+    if action_name == "set_earn_maths_difficulty":
+        return "set", "earn_maths_difficulty", str(p["level"]), None
     if action_name == "set_carryover_enabled":
         return "set", "carryover_enabled", bool(p.get("enabled")), None
     if action_name == "set_carryover_max_days":
@@ -664,6 +668,8 @@ def settings_to_pc_info(
         "earn_reward": int(settings.get("earn_reward") or 5),
         "earn_questions": int(settings.get("earn_questions") or 5),
         "earn_cap": int(settings.get("earn_cap") or 30),
+        "earn_spelling_difficulty": settings.get("earn_spelling_difficulty") or "medium",
+        "earn_maths_difficulty": settings.get("earn_maths_difficulty") or "medium",
         "earned_today": int(settings.get("earned_today") or 0),
         "carryover_enabled": bool(settings.get("carryover_enabled")),
         "carryover_max_days": int(settings.get("carryover_max_days") or 3),

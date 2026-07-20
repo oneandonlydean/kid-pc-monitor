@@ -427,17 +427,41 @@ On a PC's **Daily settings** page, the **🧠 Earn time** section lets your chil
 earn extra minutes by answering questions. You configure whether it's on, the
 **minutes earned per correct answer**, the **number of questions** per quiz, and
 a **daily cap** on how much can be earned. The on-screen timer shows two buttons,
-**Earn: Spelling** (unscramble words) and **Earn: Maths** (arithmetic); the quiz
-opens in a window centered on the screen, and correct answers grant time up to
-the cap.
+**Earn: Spelling** and **Earn: Maths**; the quiz opens in a window centered on
+the screen, and correct answers grant time up to the cap.
+
+Each subject has its own **difficulty** (Easy / Medium / Hard):
+
+- **Spelling** — Easy shows a short word with a single missing letter to fill in,
+  Medium a longer word with several letters missing, and Hard a full word to
+  unscramble. The child always types the whole word.
+- **Maths** — Easy is small addition and subtraction, Medium adds times-tables
+  and exact division, and Hard uses larger numbers across all four operations.
+
+Earned minutes count against the daily allowance but **never push past bedtime** —
+bedtime stays a hard curfew. If the child earns more than they can spend before
+bedtime, the leftover is not wasted **when carry-over is on**: it banks into
+tomorrow (see below). With carry-over off, minutes that go unused by bedtime are
+lost.
 
 ### Carry-over unused time (this fork)
 
 On the **Daily settings** page, turn on **💰 Carry-over** to roll a day's unused
 allowance into a bank, capped at a number of days' worth of the daily allowance.
-Banked minutes are added to the daily allowance automatically, so the on-screen
-timer already reflects them. On a PC's control page, **Reset today's usage** sets
-today's used time back to zero **without** spending the carry-over bank.
+Unused quiz-earned minutes bank the same way, so time earned close to bedtime
+carries to the next day instead of evaporating; parent time extensions remain
+one-day grants and never bank. Banked minutes are added to the daily allowance
+automatically, so the on-screen timer already reflects them. On a PC's control
+page, **Reset today's usage** sets today's used time back to zero **without**
+spending the carry-over bank.
+
+### On-screen timer detail (this fork)
+
+Under the **Time left** countdown, the overlay shows the budgets behind that
+number: the **bedtime** (with a live countdown to it) and the **allowance left**
+for the day, which notes how many banked carry-over minutes are included. The
+headline is always whichever limit — bedtime or allowance — comes first, so the
+child can see at a glance why time is running out.
 
 ### Usage history chart (this fork)
 

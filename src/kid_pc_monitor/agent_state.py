@@ -11,6 +11,7 @@ from datetime import datetime
 from datetime import time as dtime
 from pathlib import Path
 
+from kid_pc_monitor.earn_quiz import normalize_difficulty
 from kid_pc_monitor.lock_policy import DEFAULT_WAKE_TIME, parse_time_hhmm, usage_period_date
 
 DEFAULT_VALUES_FILE = "daily_settings.json"
@@ -33,11 +34,13 @@ class DailySettings:
     weekend_enabled: bool = False
     weekend_bed_time: dtime | None = None
     weekend_allowance: int | None = None
-    # "Earn time" spelling quiz: kid answers questions to earn extra minutes.
+    # "Earn time" quiz: kid answers questions to earn extra minutes.
     earn_enabled: bool = False
     earn_reward_minutes: int = 5  # minutes granted per correct answer
     earn_questions: int = 5  # questions per quiz session
     earn_daily_cap_minutes: int = 30  # most minutes earnable per day
+    earn_spelling_difficulty: str = "medium"  # easy | medium | hard
+    earn_maths_difficulty: str = "medium"  # easy | medium | hard
     # Carry-over: unused daily allowance rolls into a bank, capped at N days' worth.
     carryover_enabled: bool = False
     carryover_max_days: int = 3
@@ -125,18 +128,21 @@ def reset_runtime_if_needed(
 def compute_carryover_seconds(daily: DailySettings, runtime: RuntimeState, now: datetime) -> int:
     """The new carry-over bank when the usage period ending at ``now`` rolls over.
 
-    Unused allowance (the base plus the existing bank, minus what was used) rolls
-    into the bank, capped at ``carryover_max_days`` days of the base allowance.
-    Fully-idle days (agent off across a day boundary) each credit a base
-    allowance. Extensions are one-day grants and never bank. When carry-over is
-    off, or there is no daily cap, the bank is left unchanged.
+    Unused allowance (the base, the existing bank, and any quiz-earned minutes,
+    minus what was used) rolls into the bank, capped at ``carryover_max_days``
+    days of the base allowance. Earned minutes never extend past bedtime, so
+    banking whatever the kid could not spend today is how the reward survives to
+    the next day. Fully-idle days (agent off across a day boundary) each credit a
+    base allowance. Parent time extensions are one-day grants and never bank.
+    When carry-over is off, or there is no daily cap, the bank is left unchanged.
     """
     if not daily.carryover_enabled or daily.allowance is None:
         return runtime.carryover_seconds
     base = daily.allowance
     carry_minutes = runtime.carryover_seconds / 60
+    earned_minutes = runtime.earned_today_seconds / 60
     used_minutes = runtime.accumulated_seconds / 60
-    leftover = max(0.0, (base + carry_minutes) - used_minutes)
+    leftover = max(0.0, (base + carry_minutes + earned_minutes) - used_minutes)
     previous = usage_period_date(runtime.timestamp, daily.wake_time)
     current = usage_period_date(now, daily.wake_time)
     idle_days = max(0, (current - previous).days - 1)
@@ -176,6 +182,8 @@ def daily_to_dict(daily: DailySettings) -> dict:
         "earn_reward_minutes": daily.earn_reward_minutes,
         "earn_questions": daily.earn_questions,
         "earn_daily_cap_minutes": daily.earn_daily_cap_minutes,
+        "earn_spelling_difficulty": daily.earn_spelling_difficulty,
+        "earn_maths_difficulty": daily.earn_maths_difficulty,
         "carryover_enabled": daily.carryover_enabled,
         "carryover_max_days": daily.carryover_max_days,
     }
@@ -246,6 +254,8 @@ def load_daily_from_dict(data: dict) -> DailySettings:
         earn_reward_minutes=int(data.get("earn_reward_minutes", 5) or 5),
         earn_questions=int(data.get("earn_questions", 5) or 5),
         earn_daily_cap_minutes=int(data.get("earn_daily_cap_minutes", 30) or 30),
+        earn_spelling_difficulty=normalize_difficulty(data.get("earn_spelling_difficulty")),
+        earn_maths_difficulty=normalize_difficulty(data.get("earn_maths_difficulty")),
         carryover_enabled=bool(data.get("carryover_enabled", False)),
         carryover_max_days=int(data.get("carryover_max_days", 3) or 3),
     )

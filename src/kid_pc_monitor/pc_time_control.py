@@ -21,7 +21,7 @@ from kid_pc_monitor.agent_state import (
     reset_runtime_for_new_period,
     roll_over_if_needed,
 )
-from kid_pc_monitor.earn_quiz import EarnSession
+from kid_pc_monitor.earn_quiz import EarnSession, normalize_difficulty
 from kid_pc_monitor.host_platform import HostPlatform, get_default_platform
 from kid_pc_monitor.lock_policy import (
     DEFAULT_WAKE_TIME,
@@ -29,6 +29,7 @@ from kid_pc_monitor.lock_policy import (
     format_access_status,
     is_weekend_period,
     lock_decision,
+    minutes_until_bedtime,
     minutes_until_lock,
     should_monitor_user,
     usage_period_date,
@@ -487,6 +488,16 @@ class PCTimeControl:
         self.daily.earn_daily_cap_minutes = max(0, minutes)
         self.logger.info("Parent action: earn daily cap %d min", self.daily.earn_daily_cap_minutes)
 
+    def set_earn_spelling_difficulty(self, level: str) -> None:
+        self.daily.earn_spelling_difficulty = normalize_difficulty(level)
+        self.logger.info(
+            "Parent action: spelling difficulty %s", self.daily.earn_spelling_difficulty
+        )
+
+    def set_earn_maths_difficulty(self, level: str) -> None:
+        self.daily.earn_maths_difficulty = normalize_difficulty(level)
+        self.logger.info("Parent action: maths difficulty %s", self.daily.earn_maths_difficulty)
+
     def earn_remaining_minutes(self) -> int:
         """Minutes the kid may still earn today under the daily cap."""
         earned = self.runtime.earned_today_seconds / 60
@@ -516,6 +527,8 @@ class PCTimeControl:
             questions=self.daily.earn_questions,
             reward_minutes=self.daily.earn_reward_minutes,
             remaining_minutes=remaining,
+            spelling_difficulty=self.daily.earn_spelling_difficulty,
+            maths_difficulty=self.daily.earn_maths_difficulty,
         )
 
     def _earn_award(self, correct_count: int) -> int:
@@ -623,18 +636,44 @@ class PCTimeControl:
             print(f"[{datetime.now():%H:%M:%S}] Warning: {actual_mins} {unit} until lock")
             break
 
+    def allowance_minutes_left(self, now: datetime | None = None) -> float | None:
+        """Minutes left in today's screen-time budget, or None when uncapped.
+
+        This is the allowance budget only (base + carry-over + extensions minus
+        use); it ignores bedtime, which is a separate constraint.
+        """
+        now = now or datetime.now()
+        allowance = self._effective_usage_allowance_minutes(now)
+        if allowance is None:
+            return None
+        return allowance - self.runtime.accumulated_seconds / 60
+
     def update_time_overlay(self) -> None:
         """Refresh the kid's on-screen countdown.
 
         Shows minutes remaining for a monitored user with an active limit and
-        hides otherwise. No-op on platforms without an on-screen overlay.
+        hides otherwise. The detail lines break that number down into the
+        bedtime and allowance budgets behind it. No-op on platforms without an
+        on-screen overlay.
         """
         show = self.should_monitor_user() and self.daily.show_timer
-        state = overlay_state(self.get_time_remaining()) if show else None
+        if not show:
+            self.platform.update_time_overlay(None)
+            return
+
+        now = datetime.now()
+        bed_time = self._effective_bed_time(now)
+        state = overlay_state(
+            self.get_time_remaining(),
+            bed_time=bed_time,
+            minutes_until_bedtime=minutes_until_bedtime(now, bed_time),
+            allowance_minutes_left=self.allowance_minutes_left(now),
+            carryover_minutes=self.carryover_minutes() if self.daily.carryover_enabled else 0,
+        )
         if state is None:
             self.platform.update_time_overlay(None)
         else:
-            self.platform.update_time_overlay(state.text, urgent=state.urgent)
+            self.platform.update_time_overlay(state.text, urgent=state.urgent, detail=state.detail)
 
     def currently_in_lock_window(self):
         """

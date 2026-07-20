@@ -383,9 +383,11 @@ class _TimeOverlay:
         self._lock = threading.Lock()
         self._desired_text: str | None = None
         self._desired_urgent = False
+        self._desired_detail = ""
         self._started = False
         self._root: tk.Tk | None = None
         self._label: tk.Label | None = None
+        self._detail_label: tk.Label | None = None
         self._button: tk.Button | None = None
         self._earn_spell_button: tk.Button | None = None
         self._earn_math_button: tk.Button | None = None
@@ -414,11 +416,12 @@ class _TimeOverlay:
             self._earn_start = start_session
             self._earn_award = award
 
-    def update(self, text: str | None, urgent: bool = False) -> None:
+    def update(self, text: str | None, urgent: bool = False, detail: str = "") -> None:
         """Publish the text/urgency to display (or ``None`` to hide); start UI lazily."""
         with self._lock:
             self._desired_text = text
             self._desired_urgent = urgent
+            self._desired_detail = detail
             if self._started or text is None:
                 return
             self._started = True
@@ -451,6 +454,15 @@ class _TimeOverlay:
                 pady=7,
             )
             label.pack(fill="x")
+            detail_label = tk.Label(
+                root,
+                text="",
+                font=("Segoe UI", 8),
+                fg="#bbbbbb",
+                bg=self._NORMAL_BG,
+                justify="center",
+            )
+            # Packed/unpacked on demand in _refresh so an empty detail leaves no gap.
             button = tk.Button(
                 root,
                 text="Ask for more time",
@@ -505,6 +517,7 @@ class _TimeOverlay:
             move_button.pack(fill="x", padx=6, pady=(0, 6))
             self._root = root
             self._label = label
+            self._detail_label = detail_label
             self._button = button
             self._earn_spell_button = earn_spell_button
             self._earn_math_button = earn_math_button
@@ -587,7 +600,10 @@ class _TimeOverlay:
 
         from random import Random
 
-        items = earn_quiz.generate_quiz(subject, session.questions, Random())
+        difficulty = (
+            session.maths_difficulty if subject == earn_quiz.MATHS else session.spelling_difficulty
+        )
+        items = earn_quiz.generate_quiz(subject, session.questions, Random(), difficulty)
         try:
             _QuizDialog(root, subject, items, session, award).run()
         except Exception as exc:
@@ -708,6 +724,25 @@ class _TimeOverlay:
         if self._root is not None:
             self._place(self._root, force=True)
 
+    def _update_detail(self, detail: str, *, bg: str, urgent: bool) -> None:
+        """Show the breakdown lines under the countdown, hiding the label when empty."""
+        widget = self._detail_label
+        if widget is None:
+            return
+        if not detail:
+            widget.pack_forget()
+            return
+        fg = self._URGENT_FG if urgent else "#bbbbbb"
+        if widget.cget("text") != detail or widget.cget("bg") != bg:
+            widget.config(text=detail, bg=bg, fg=fg)
+        if not widget.winfo_ismapped():
+            # Sits between the countdown and the buttons; falls back to append
+            # order if the buttons are not built yet.
+            if self._button is not None:
+                widget.pack(fill="x", before=self._button, padx=6, pady=(0, 4))
+            else:
+                widget.pack(fill="x", padx=6, pady=(0, 4))
+
     def _refresh(self) -> None:
         root = self._root
         label = self._label
@@ -716,6 +751,7 @@ class _TimeOverlay:
         with self._lock:
             text = self._desired_text
             urgent = self._desired_urgent
+            detail = self._desired_detail
         try:
             if text is None:
                 root.withdraw()
@@ -725,6 +761,7 @@ class _TimeOverlay:
                 if label.cget("text") != text or label.cget("bg") != bg:
                     label.config(text=text, bg=bg, fg=fg)
                     root.configure(bg=bg)
+                self._update_detail(detail, bg=bg, urgent=urgent)
                 self._place(root)
                 root.deiconify()
                 root.lift()
@@ -745,8 +782,10 @@ class WindowsHostPlatform(HostPlatform):
     def __init__(self) -> None:
         self._time_overlay = _TimeOverlay()
 
-    def update_time_overlay(self, text: str | None, *, urgent: bool = False) -> None:
-        self._time_overlay.update(text, urgent)
+    def update_time_overlay(
+        self, text: str | None, *, urgent: bool = False, detail: str = ""
+    ) -> None:
+        self._time_overlay.update(text, urgent, detail)
 
     def set_overlay_request_handler(self, handler: Callable[[], None] | None) -> None:
         self._time_overlay.set_request_handler(handler)

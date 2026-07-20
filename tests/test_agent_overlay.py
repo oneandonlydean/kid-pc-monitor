@@ -5,10 +5,20 @@ from __future__ import annotations
 import tempfile
 import unittest
 from collections.abc import Callable
+from datetime import datetime
+from datetime import time as dtime
 from pathlib import Path
+from unittest import mock
 
-from kid_pc_monitor.agent_overlay import corner_geometry, overlay_label, overlay_state
+from kid_pc_monitor.agent_overlay import (
+    corner_geometry,
+    format_duration,
+    overlay_detail_lines,
+    overlay_label,
+    overlay_state,
+)
 from kid_pc_monitor.host_platform import HostPlatform
+from kid_pc_monitor.lock_policy import minutes_until_bedtime
 from kid_pc_monitor.pc_time_control import PCTimeControl
 
 
@@ -80,11 +90,98 @@ class OverlayStateTests(unittest.TestCase):
         self.assertTrue(overlay_state(9, urgent_below_minutes=10).urgent)  # type: ignore[union-attr]
 
 
+class FormatDurationTests(unittest.TestCase):
+    def test_minutes_and_seconds(self) -> None:
+        self.assertEqual(format_duration(45), "45:00")
+        self.assertEqual(format_duration(44.1), "44:06")
+
+    def test_hours_use_h_mm_ss(self) -> None:
+        self.assertEqual(format_duration(60), "1:00:00")
+        self.assertEqual(format_duration(125), "2:05:00")
+
+    def test_at_least_one_second(self) -> None:
+        self.assertEqual(format_duration(0.001), "0:01")
+
+
+class MinutesUntilBedtimeTests(unittest.TestCase):
+    def test_none_when_no_bedtime(self) -> None:
+        self.assertIsNone(minutes_until_bedtime(datetime(2026, 7, 20, 19, 18), None))
+
+    def test_counts_down_to_tonight(self) -> None:
+        now = datetime(2026, 7, 20, 19, 18)
+        self.assertEqual(minutes_until_bedtime(now, dtime(20, 30)), 72)
+
+    def test_rolls_to_tomorrow_once_past(self) -> None:
+        now = datetime(2026, 7, 20, 21, 0)
+        self.assertEqual(minutes_until_bedtime(now, dtime(20, 30)), 23 * 60 + 30)
+
+
+class OverlayDetailLinesTests(unittest.TestCase):
+    def test_empty_without_context(self) -> None:
+        self.assertEqual(overlay_detail_lines(), [])
+
+    def test_bedtime_line_shows_clock_time_and_countdown(self) -> None:
+        lines = overlay_detail_lines(bed_time=dtime(20, 30), minutes_until_bedtime=72)
+        self.assertEqual(lines, ["Bedtime 20:30 — in 1:12:00"])
+
+    def test_bedtime_line_without_countdown(self) -> None:
+        self.assertEqual(overlay_detail_lines(bed_time=dtime(20, 30)), ["Bedtime 20:30"])
+
+    def test_allowance_line(self) -> None:
+        self.assertEqual(
+            overlay_detail_lines(allowance_minutes_left=35.5),
+            ["Allowance left: 35:30"],
+        )
+
+    def test_allowance_line_notes_carryover(self) -> None:
+        self.assertEqual(
+            overlay_detail_lines(allowance_minutes_left=50, carryover_minutes=20),
+            ["Allowance left: 50:00 (incl. 20 min saved)"],
+        )
+
+    def test_negative_allowance_floors_at_zero(self) -> None:
+        self.assertEqual(
+            overlay_detail_lines(allowance_minutes_left=-5),
+            ["Allowance left: 0:01"],
+        )
+
+    def test_both_lines_together(self) -> None:
+        lines = overlay_detail_lines(
+            bed_time=dtime(20, 30),
+            minutes_until_bedtime=72,
+            allowance_minutes_left=35,
+            carryover_minutes=10,
+        )
+        self.assertEqual(
+            lines,
+            ["Bedtime 20:30 — in 1:12:00", "Allowance left: 35:00 (incl. 10 min saved)"],
+        )
+
+
+class OverlayStateDetailTests(unittest.TestCase):
+    def test_detail_is_empty_without_context(self) -> None:
+        state = overlay_state(45)
+        assert state is not None
+        self.assertEqual(state.detail, "")
+
+    def test_detail_joins_lines_with_newlines(self) -> None:
+        state = overlay_state(
+            72,
+            bed_time=dtime(20, 30),
+            minutes_until_bedtime=72,
+            allowance_minutes_left=35,
+        )
+        assert state is not None
+        self.assertEqual(state.text, "Time left: 1:12:00")
+        self.assertEqual(state.detail, "Bedtime 20:30 — in 1:12:00\nAllowance left: 35:00")
+
+
 class _RecordingPlatform(HostPlatform):
     """Minimal platform stub that records on-screen overlay updates."""
 
     def __init__(self) -> None:
         self.overlay_calls: list[tuple[str | None, bool]] = []
+        self.detail_calls: list[str] = []
         self.request_handler: Callable[[], None] | None = None
         self.earn_start: Callable[[], object] | None = None
         self.earn_award: Callable[[int], int] | None = None
@@ -110,8 +207,11 @@ class _RecordingPlatform(HostPlatform):
     def get_hostname(self) -> str:
         return "test-pc"
 
-    def update_time_overlay(self, text: str | None, *, urgent: bool = False) -> None:
+    def update_time_overlay(
+        self, text: str | None, *, urgent: bool = False, detail: str = ""
+    ) -> None:
         self.overlay_calls.append((text, urgent))
+        self.detail_calls.append(detail)
 
     def set_overlay_request_handler(self, handler: Callable[[], None] | None) -> None:
         self.request_handler = handler
@@ -151,6 +251,47 @@ class UpdateTimeOverlayTests(unittest.TestCase):
             control.runtime.accumulated_seconds = 87 * 60  # 3 min left -> urgent
             control.update_time_overlay()
         self.assertEqual(platform.overlay_calls, [("Time left: 3:00", True)])
+
+    def test_detail_shows_bedtime_countdown_and_allowance(self) -> None:
+        platform = _RecordingPlatform()
+        now = datetime(2026, 7, 20, 19, 18)
+        with tempfile.TemporaryDirectory() as tmp:
+            control = PCTimeControl(
+                platform=platform,
+                data_directory=Path(tmp),
+                start_background_threads=False,
+            )
+            control.set_daily_allowance(120)
+            control.set_bed_time(20, 30)
+            control.runtime.accumulated_seconds = 60 * 60  # 60 of 120 min used
+            with mock.patch("kid_pc_monitor.pc_time_control.datetime") as dt:
+                dt.now.return_value = now
+                control.update_time_overlay()
+        # Bedtime (72 min away) binds before the 60 min of allowance left.
+        self.assertEqual(platform.overlay_calls, [("Time left: 1:00:00", False)])
+        self.assertEqual(
+            platform.detail_calls,
+            ["Bedtime 20:30 — in 1:12:00\nAllowance left: 1:00:00"],
+        )
+
+    def test_detail_reports_carryover_when_enabled(self) -> None:
+        platform = _RecordingPlatform()
+        now = datetime(2026, 7, 20, 12, 0)
+        with tempfile.TemporaryDirectory() as tmp:
+            control = PCTimeControl(
+                platform=platform,
+                data_directory=Path(tmp),
+                start_background_threads=False,
+            )
+            control.set_daily_allowance(60)
+            control.set_carryover_enabled(True)
+            control.runtime.carryover_seconds = 20 * 60
+            with mock.patch("kid_pc_monitor.pc_time_control.datetime") as dt:
+                dt.now.return_value = now
+                control.update_time_overlay()
+        # 60 base + 20 banked, nothing used yet.
+        self.assertEqual(platform.overlay_calls, [("Time left: 1:20:00", False)])
+        self.assertEqual(platform.detail_calls, ["Allowance left: 1:20:00 (incl. 20 min saved)"])
 
     def test_hidden_for_exempt_user(self) -> None:
         platform = _RecordingPlatform()

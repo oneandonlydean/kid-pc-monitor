@@ -8,6 +8,7 @@ from kid_pc_monitor.agent_protocol import (
     CLEARABLE_VARIABLES,
     DEFAULT_LOG_TAIL_LINES,
     DEFAULT_SHUTDOWN_SECONDS,
+    EARN_DIFFICULTIES,
     FORBIDDEN,
     INVALID_VALUE,
     MAX_BREAK_DURATION,
@@ -63,6 +64,15 @@ def _parse_bool(raw: Any, req_id: str | None) -> bool:
     raise ProtocolError(INVALID_VALUE, "expected a boolean", req_id)
 
 
+def _parse_difficulty(raw: Any, req_id: str | None) -> str:
+    text = str(raw).strip().lower()
+    if text not in EARN_DIFFICULTIES:
+        raise ProtocolError(
+            INVALID_VALUE, f"difficulty must be one of {', '.join(EARN_DIFFICULTIES)}", req_id
+        )
+    return text
+
+
 def _read_variable(control: Any, var: str) -> Any:
     if var == "name":
         return control.platform.get_hostname()
@@ -101,6 +111,10 @@ def _read_variable(control: Any, var: str) -> Any:
         return int(control.daily.earn_questions)
     if var == "earn_cap":
         return int(control.daily.earn_daily_cap_minutes)
+    if var == "earn_spelling_difficulty":
+        return str(control.daily.earn_spelling_difficulty)
+    if var == "earn_maths_difficulty":
+        return str(control.daily.earn_maths_difficulty)
     if var == "earned_today":
         return int(control.runtime.earned_today_seconds // 60)
     if var == "carryover_enabled":
@@ -225,6 +239,14 @@ def _do_set(control: Any, req: Request) -> list[Node]:
             )
         control.set_earn_cap(minutes)
         result = minutes
+    elif var == "earn_spelling_difficulty":
+        level = _parse_difficulty(val, req_id)
+        control.set_earn_spelling_difficulty(level)
+        result = level
+    elif var == "earn_maths_difficulty":
+        level = _parse_difficulty(val, req_id)
+        control.set_earn_maths_difficulty(level)
+        result = level
     elif var == "carryover_enabled":
         enabled = _parse_bool(val, req_id)
         control.set_carryover_enabled(enabled)

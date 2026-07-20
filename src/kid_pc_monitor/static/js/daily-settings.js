@@ -134,6 +134,20 @@ registerHandlers({
             { button: el, reloadDelay: 1000 }
         );
     },
+    "save-earn-spelling-difficulty": function (el) {
+        const level = document.getElementById("earn-spelling-difficulty").value;
+        postAction(
+            { action: "set_earn_spelling_difficulty", level: level },
+            { button: el, reloadDelay: 1000 }
+        );
+    },
+    "save-earn-maths-difficulty": function (el) {
+        const level = document.getElementById("earn-maths-difficulty").value;
+        postAction(
+            { action: "set_earn_maths_difficulty", level: level },
+            { button: el, reloadDelay: 1000 }
+        );
+    },
     "save-carryover-enabled": function (el) {
         const enabled = document.getElementById("carryover-enabled").checked;
         postAction(

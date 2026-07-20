@@ -477,6 +477,22 @@ class PCTimeControlTests(unittest.TestCase):
             control = self._earn_control(tmp)
             self.assertEqual(control._earn_award(4), 12)  # 4 correct * 3 min
 
+    def test_earn_session_carries_per_subject_difficulty(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            control = self._earn_control(tmp)
+            control.set_earn_spelling_difficulty("easy")
+            control.set_earn_maths_difficulty("hard")
+            session = control._earn_session()
+            assert session is not None
+            self.assertEqual(session.spelling_difficulty, "easy")
+            self.assertEqual(session.maths_difficulty, "hard")
+
+    def test_earn_difficulty_setters_reject_junk(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            control = self._earn_control(tmp)
+            control.set_earn_spelling_difficulty("nonsense")
+            self.assertEqual(control.daily.earn_spelling_difficulty, "medium")
+
     def test_effective_allowance_includes_carryover_when_enabled(self) -> None:
         weekday = datetime(2026, 7, 15, 12, 0)
         with tempfile.TemporaryDirectory() as tmp:
@@ -491,6 +507,34 @@ class PCTimeControlTests(unittest.TestCase):
             self.assertEqual(control._effective_base_allowance(weekday), 90)
             control.daily.carryover_enabled = False
             self.assertEqual(control._effective_base_allowance(weekday), 60)
+
+    def test_earned_minutes_bank_into_carryover_at_rollover(self) -> None:
+        # End-to-end: earn near bedtime, then let the day roll over; unused
+        # earned minutes should survive as carry-over instead of evaporating.
+        with tempfile.TemporaryDirectory() as tmp:
+            control = self._earn_control(tmp)
+            control.daily.allowance = 60
+            control.daily.bed_time = dtime(21, 0)
+            control.daily.carryover_enabled = True
+            control.runtime.accumulated_seconds = 60 * 60  # used the whole base
+
+            awarded = control.award_earned_time(15)
+            self.assertEqual(awarded, 15)  # 3 min/correct config, capped by daily cap
+            self.assertEqual(control.runtime.earned_today_seconds, 15 * 60)
+
+            # award_earned_time persists and stamps "now"; backdate so the tick
+            # below sees a new usage period and rolls over.
+            control.runtime.timestamp = datetime(2026, 7, 20, 20, 55)
+
+            # Next usage period begins; the accumulator tick rolls the day over.
+            with mock.patch("kid_pc_monitor.pc_time_control.datetime") as dt:
+                dt.now.return_value = datetime(2026, 7, 21, 8, 0)
+                control.tick_accumulator()
+
+            self.assertEqual(control.runtime.accumulated_seconds, 0.0)
+            self.assertEqual(control.runtime.earned_today_seconds, 0)
+            self.assertEqual(control.runtime.carryover_seconds, 15 * 60)
+            self.assertEqual(control.carryover_minutes(), 15)
 
     def test_reset_today_keeps_carryover(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -15,6 +15,7 @@ from kid_pc_monitor.agent_state import (
     RuntimeState,
     effective_daily_allowance_minutes,
     fresh_runtime_state,
+    load_daily_from_dict,
     migrate_legacy_state,
     reset_runtime_for_new_period,
     reset_runtime_if_needed,
@@ -125,13 +126,16 @@ class AgentStateTests(unittest.TestCase):
             loaded_daily, _ = store.load()
             self.assertIs(loaded_daily.show_timer, False)
 
-    def _stale_runtime(self, *, used_min: int = 0, carry_min: int = 0) -> RuntimeState:
+    def _stale_runtime(
+        self, *, used_min: int = 0, carry_min: int = 0, earned_min: int = 0
+    ) -> RuntimeState:
         return RuntimeState(
             timestamp=datetime(2026, 7, 18, 12, 0),  # a Saturday, previous period
             accumulated_seconds=used_min * 60,
             manual_lock_active=False,
-            cumulative_extension_seconds=0,
+            cumulative_extension_seconds=earned_min * 60,
             carryover_seconds=carry_min * 60,
+            earned_today_seconds=earned_min * 60,
         )
 
     _NEXT_DAY = datetime(2026, 7, 19, 12, 0)
@@ -148,6 +152,34 @@ class AgentStateTests(unittest.TestCase):
         self.assertTrue(roll_over_if_needed(daily, runtime, self._NEXT_DAY))
         self.assertEqual(runtime.accumulated_seconds, 0.0)  # new day reset
         self.assertEqual(runtime.carryover_seconds, 40 * 60)  # 60 - 20 unused, banked
+
+    def test_carryover_banks_unused_earned_minutes(self) -> None:
+        # Earned minutes never extend past bedtime; whatever the kid could not
+        # spend today banks into carry-over instead of evaporating.
+        daily = DailySettings(
+            bed_time=dtime(21, 0),
+            wake_time=dtime(7, 0),
+            allowance=60,
+            carryover_enabled=True,
+            carryover_max_days=3,
+        )
+        # Used all 60 base, earned 25 via the quiz, spent none of it (bedtime).
+        runtime = self._stale_runtime(used_min=60, earned_min=25)
+        self.assertTrue(roll_over_if_needed(daily, runtime, self._NEXT_DAY))
+        self.assertEqual(runtime.carryover_seconds, 25 * 60)
+        self.assertEqual(runtime.earned_today_seconds, 0)  # reset for the new day
+
+    def test_earned_minutes_do_not_bank_when_carryover_off(self) -> None:
+        daily = DailySettings(
+            bed_time=dtime(21, 0),
+            wake_time=dtime(7, 0),
+            allowance=60,
+            carryover_enabled=False,
+            carryover_max_days=3,
+        )
+        runtime = self._stale_runtime(used_min=60, earned_min=25)
+        roll_over_if_needed(daily, runtime, self._NEXT_DAY)
+        self.assertEqual(runtime.carryover_seconds, 0)  # earned time is lost when off
 
     def test_carryover_capped_at_max_days(self) -> None:
         daily = DailySettings(
@@ -202,6 +234,8 @@ class AgentStateTests(unittest.TestCase):
                 earn_reward_minutes=10,
                 earn_questions=8,
                 earn_daily_cap_minutes=45,
+                earn_spelling_difficulty="easy",
+                earn_maths_difficulty="hard",
             )
             runtime = RuntimeState(
                 timestamp=datetime.now(),
@@ -216,7 +250,24 @@ class AgentStateTests(unittest.TestCase):
             self.assertEqual(loaded_daily.earn_reward_minutes, 10)
             self.assertEqual(loaded_daily.earn_questions, 8)
             self.assertEqual(loaded_daily.earn_daily_cap_minutes, 45)
+            self.assertEqual(loaded_daily.earn_spelling_difficulty, "easy")
+            self.assertEqual(loaded_daily.earn_maths_difficulty, "hard")
             self.assertEqual(loaded_runtime.earned_today_seconds, 600)
+
+    def test_earn_difficulty_defaults_and_bad_values_normalize(self) -> None:
+        # Missing keys default to medium; junk values are coerced to medium.
+        self.assertEqual(
+            load_daily_from_dict({"wake_time": "07:00"}).earn_spelling_difficulty, "medium"
+        )
+        coerced = load_daily_from_dict(
+            {
+                "wake_time": "07:00",
+                "earn_spelling_difficulty": "nonsense",
+                "earn_maths_difficulty": "HARD",
+            }
+        )
+        self.assertEqual(coerced.earn_spelling_difficulty, "medium")
+        self.assertEqual(coerced.earn_maths_difficulty, "hard")
 
     def test_weekend_schedule_round_trip(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
