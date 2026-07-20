@@ -1063,15 +1063,173 @@ def run_install_flow():
     return False
 
 
+AUTO_UPDATE_TASK_NAME = "KidPCMonitorUpdate"
+
+
+def repo_root_dir():
+    """Repo root (the parent of this scripts/ directory)."""
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def git_pull_repo():
+    """Best-effort fast-forward `git pull` in the repo. Returns True on success."""
+    repo = repo_root_dir()
+    try:
+        result = subprocess.run(
+            ["git", "-C", repo, "pull", "--ff-only"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        print(f"⚠️  Could not run 'git pull' ({exc}); redeploying the current files.")
+        return False
+    out = (result.stdout or "").strip()
+    err = (result.stderr or "").strip()
+    if result.returncode == 0:
+        print(f"✅ git pull: {out or 'already up to date'}")
+        return True
+    print(f"⚠️  'git pull' failed: {err or out}; redeploying the current files.")
+    return False
+
+
+def redeploy_agent():
+    """Re-copy the agent package to ProgramData for the previously-installed user."""
+    target_user = program_data_target_user()
+    if not target_user:
+        print("❌ No previous install found (no monitored user recorded in ProgramData).")
+        print("   Run a full install first:  python scripts\\install.py")
+        return False
+    source_package = find_repo_package_dir()
+    if not source_package:
+        print("❌ Could not locate the kid_pc_monitor package next to this installer.")
+        return False
+
+    # Stop the running agent so its files are not in use during the copy.
+    subprocess.run(f'schtasks /end /tn "{TASK_NAME}"', shell=True, capture_output=True, text=True)
+    print(f"📦 Updating agent files in {INSTALL_DIR_DEFAULT} for '{target_user}' ...")
+    install_to_programdata(target_user, source_package)
+    print("✅ Agent files updated.")
+
+    started = subprocess.run(
+        f'schtasks /run /tn "{TASK_NAME}"', shell=True, capture_output=True, text=True
+    )
+    if started.returncode == 0:
+        print(f"🔄 Restarted the {TASK_NAME} agent with the new code.")
+    else:
+        print(
+            "ℹ️  Could not auto-start the agent now (normal if the kid isn't logged in);\n"
+            "   the new code runs at their next logon."
+        )
+    return True
+
+
+def enable_auto_update():
+    """Install a SYSTEM scheduled task that pulls + redeploys the agent automatically."""
+    python_path = find_system_python() or sys.executable
+    repo = repo_root_dir()
+    script = os.path.join(repo, "scripts", "install.py")
+    ps_script = f"""
+    $ErrorActionPreference = 'Stop'
+    try {{
+        $action = New-ScheduledTaskAction -Execute "{python_path}" `
+            -Argument '"{script}" --update --pull' -WorkingDirectory "{repo}"
+        $atStartup = New-ScheduledTaskTrigger -AtStartup
+        $atStartup.Delay = 'PT2M'
+        $daily = New-ScheduledTaskTrigger -Daily -At 4am
+        $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+        $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+        Register-ScheduledTask -TaskName '{AUTO_UPDATE_TASK_NAME}' -Action $action `
+            -Trigger @($atStartup, $daily) -Principal $principal -Settings $settings -Force | Out-Null
+        Write-Host 'SUCCESS'
+    }} catch {{
+        Write-Host "ERROR: $_"
+        exit 1
+    }}
+    """
+    result = subprocess.run(
+        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0 and "SUCCESS" in (result.stdout or ""):
+        print(f"✅ Automatic updates enabled (scheduled task '{AUTO_UPDATE_TASK_NAME}').")
+        print("   The PC pulls the latest code ~2 min after startup and daily at 4am,")
+        print("   then the agent runs it at the kid's next logon.")
+        print("   Requires Git installed for all users (on the system PATH).")
+        return True
+    print("❌ Could not enable automatic updates.")
+    if result.stdout.strip():
+        print(result.stdout.strip())
+    if result.stderr.strip():
+        print(result.stderr.strip())
+    return False
+
+
+def disable_auto_update():
+    result = subprocess.run(
+        f'schtasks /delete /tn "{AUTO_UPDATE_TASK_NAME}" /f',
+        shell=True,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        print(f"✅ Automatic updates disabled ('{AUTO_UPDATE_TASK_NAME}' removed).")
+    else:
+        print("ℹ️  No automatic-update task was found.")
+    return True
+
+
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Kid PC Monitor agent installer / updater.",
+    )
+    parser.add_argument(
+        "--update",
+        action="store_true",
+        help="Re-deploy the agent from the current repo checkout (non-interactive).",
+    )
+    parser.add_argument(
+        "--pull",
+        action="store_true",
+        help="With --update: run 'git pull' first.",
+    )
+    parser.add_argument(
+        "--enable-auto-update",
+        action="store_true",
+        help="Install a scheduled task that pulls + redeploys the agent automatically.",
+    )
+    parser.add_argument(
+        "--disable-auto-update",
+        action="store_true",
+        help="Remove the automatic-update scheduled task.",
+    )
+    args = parser.parse_args()
+
+    non_interactive = (
+        args.update or args.enable_auto_update or args.disable_auto_update
+    )
+
     print("Kid PC Monitor - Task Scheduler Setup")
     print("=" * 45)
 
     if not check_admin():
         print("\n❌ This script needs to run as Administrator!")
         print("   Please right-click and select 'Run as administrator'")
-        input("\nPress Enter to exit...")
+        if not non_interactive:
+            input("\nPress Enter to exit...")
         sys.exit(1)
+
+    if args.disable_auto_update:
+        sys.exit(0 if disable_auto_update() else 1)
+    if args.enable_auto_update:
+        sys.exit(0 if enable_auto_update() else 1)
+    if args.update:
+        if args.pull:
+            git_pull_repo()
+        sys.exit(0 if redeploy_agent() else 1)
 
     print("\nWhat would you like to do?")
     print("1. Create/Update scheduled task")

@@ -162,6 +162,25 @@ python scripts\install_web_panel.py
 
 Choose option 2, `Remove scheduled task`
 
+## 🔄 Updating (this fork)
+
+The agent runs from a **copy** in `C:\ProgramData\KidPCMonitor`, so pulling new
+code into your checkout isn't enough on its own — it also has to be redeployed.
+Pick whichever is easiest:
+
+- **One-click (recommended):** double-click **`update.bat`** in the repo folder on
+  the kid's PC. It elevates, runs `git pull`, redeploys the agent, and restarts it.
+- **Fully automatic:** run **`update.bat auto`** once. It installs a scheduled task
+  that pulls and redeploys automatically — about 2 minutes after each startup and
+  daily at 4am — so the agent runs the latest code at the kid's next logon. Turn it
+  off with `update.bat auto-off`. (Automatic updates need **Git installed for all
+  users** so the SYSTEM task can find it on the system PATH.)
+- **By hand:** from an administrator prompt, `git pull` then
+  `python scripts\install.py --update` (add `--pull` to pull first).
+
+The **parent web panel** runs from the checkout directly, so there you only need
+`git pull` and a restart of the panel (or its systemd service).
+
 ## 📸 Screenshots
 
 ![Main control panel](screenshots/main-control-panel.png)
